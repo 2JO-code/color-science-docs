@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>色管理ドキュメント</title>
+<meta name="description" content="色管理 (カラーマネジメント) の用語と考え方、カラーチャートのレポート。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="page">
+
+<nav class="site-nav" aria-label="サイト内">
+  <a class="home" href="index.html">color-science-docs</a>
+  <a href="knowledge.html">ナレッジ</a>
+  <a href="reports/charts.html">チャート一覧</a>
+</nav>
+
+<main>
+<h1>色管理ドキュメント</h1>
+
+<p class="lead">カラーチャート生成ツール <a href="https://github.com/2JO-code/dev-colormanagement">colorchart</a> を支える、
+色の知識と検証レポートをまとめたサイトです。色の基準は ICC D50、色順応は Bradford で統一しています。</p>
+
+<h2 id="knowledge">ナレッジ</h2>
+<div class="cards">
+  <a class="card" href="knowledge.html">
+    <p class="card-title">色管理のナレッジ — 用語と考え方</p>
+    <p>色空間、Lab、白色点と色順応、ICC と PCS、ガンマ、変換行列、量子化、ΔE2000、ColorChecker を基礎から順に。</p>
+  </a>
+  <a class="card" href="knowledge.html#glossary">
+    <p class="card-title">用語索引</p>
+    <p>わからない言葉を一言の説明から引けます。</p>
+  </a>
+</div>
+
+<h2 id="reports">レポート</h2>
+<p class="note">ツールのコマンドで自動生成したページです。各ページと同じ名前の JSON に、元の数値がすべて入っています。</p>
+
+<div class="cards">
+  <a class="card" href="reports/charts.html">
+    <p class="card-title">カラーチャート一覧</p>
+    <p>全チャートの Lab 値を、6 種類の白色点 (D50 / D55 / D65 / D75 / A / C) ごとに。</p>
+  </a>
+</div>
+
+<h3>精度比較 (8bit / 16bit / 32bit)</h3>
+<p class="note">同じチャートをビット深度を変えて書き出したとき、基準の色とどれだけずれるか (ΔE2000) の比較です。</p>
+<div class="cards">
+  <a class="card" href="reports/compare_colorchecker24_srgb.html">
+    <p class="card-title">ColorChecker 24 × sRGB</p>
+    <p>最もよく使われる 24 色カード。</p>
+  </a>
+  <a class="card" href="reports/compare_colorchecker-sg_srgb.html">
+    <p class="card-title">ColorChecker SG × sRGB</p>
+    <p>カメラ校正用の 140 色版。</p>
+  </a>
+  <a class="card" href="reports/compare_gray-ramp_display-p3.html">
+    <p class="card-title">グレー階調 × Display P3</p>
+    <p>L* を等間隔に並べた 21 段のグレー。</p>
+  </a>
+</div>
+</main>
+
+<footer>
+  色の変換・計算は <a href="https://www.colour-science.org/">colour-science</a> によります。
+  ツール本体: <a href="https://github.com/2JO-code/dev-colormanagement">dev-colormanagement</a>
+</footer>
+
+</div>
+</body>
+</html>

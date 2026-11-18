@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>色管理のナレッジ</title>
+<meta name="description" content="色空間、Lab、白色点と色順応、ガンマ、量子化、ΔE2000 など、色管理の用語と考え方を基礎から順にまとめたページ。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="page">
+
+<nav class="site-nav" aria-label="サイト内">
+  <a class="home" href="index.html">color-science-docs</a>
+  <a href="knowledge.html">ナレッジ</a>
+  <a href="reports/charts.html">チャート一覧</a>
+</nav>
+
+<main>
+<h1 id="top">色管理のナレッジ — 用語と考え方</h1>
+
+<p class="lead">colorchart を理解するのに必要な色の知識を、基礎から順にまとめました。
+上から順に読むと、最後の「<a href="#reliability">10. このツールの信頼性の考え方</a>」につながる構成です。
+各章の終わりに <strong>「このツールでは」</strong> として、コードのどこに対応するかを書いています。</p>
+
+<p class="lead">ツールの操作方法は、ツールのリポジトリの
+<a href="https://github.com/2JO-code/dev-colormanagement/blob/main/docs/usage.md">usage.md</a> を見てください。</p>
+
+<nav class="toc" aria-label="目次">
+  <p class="toc-title">目次</p>
+  <ol>
+    <li><a href="#color-space">色空間</a></li>
+    <li><a href="#lab">XYZ と Lab — 色を「見え方」で表す</a></li>
+    <li><a href="#white">白色点と色順応</a></li>
+    <li><a href="#icc">ICC プロファイルと PCS</a></li>
+    <li><a href="#gamma">ガンマ (トーンカーブ)</a></li>
+    <li><a href="#matrix">変換行列</a></li>
+    <li><a href="#clip">量子化とクリップ</a></li>
+    <li><a href="#delta-e">ΔE2000 — 色の差を測る</a></li>
+    <li><a href="#colorchecker">ColorChecker</a></li>
+    <li><a href="#reliability">このツールの信頼性の考え方</a></li>
+  </ol>
+  <p style="margin:0.5rem 0 0"><a href="#glossary">用語索引</a></p>
+</nav>
+
+<!-- ============================================================ 1 -->
+<section>
+<h2 id="color-space">1. 色空間<a class="anchor" href="#color-space" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="rgb-numbers">RGB の数字だけでは色は決まらない<a class="anchor" href="#rgb-numbers" aria-label="この節へのリンク">#</a></h3>
+
+<p>画像の 1 ピクセルは、たとえば <code>R=0, G=133, B=165</code> のような 3 つの数字 (<strong>コード値</strong>) で表されます。
+ところが、この数字だけでは「どんな色か」は決まりません。
+<strong>「R を最大にしたときの赤がどんな赤か」「白はどんな白か」</strong> という約束がないと、ディスプレイごとに違う色になってしまうからです。</p>
+
+<p>この約束をまとめたものが<strong>色空間</strong> (RGB 色空間) です。中身は次の 3 つです。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>要素</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>原色 (primaries)</td><td>R・G・B それぞれを最大にしたときの、正確な色</td></tr>
+<tr><td>白色点 (white point)</td><td>R=G=B=最大のときの白が、どんな白か (<a href="#white">3 章</a>)</td></tr>
+<tr><td>トーンカーブ</td><td>コード値と実際の光の強さの関係 (<a href="#gamma">5 章</a>)</td></tr>
+</tbody>
+</table></div>
+
+<h3 id="gamut">色域 (gamut)<a class="anchor" href="#gamut" aria-label="この節へのリンク">#</a></h3>
+
+<p>色空間が表せる色の範囲を<strong>色域</strong>といいます。原色が鮮やかなほど色域は広くなります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>色空間</th><th>色域の広さ</th><th>主な用途</th><th>白色点</th></tr></thead>
+<tbody>
+<tr><td>sRGB</td><td>標準</td><td>一般的なモニター、Web、多くの画像</td><td>D65</td></tr>
+<tr><td>Display P3</td><td>sRGB より広い (特に赤・緑)</td><td>Mac・iPhone などの広色域ディスプレイ</td><td>D65</td></tr>
+<tr><td>Adobe RGB (1998)</td><td>sRGB より広い (特に緑〜シアン)</td><td>写真・印刷</td><td>D65</td></tr>
+</tbody>
+</table></div>
+
+<p>同じ色でも、色空間が違えばコード値は変わります。たとえば ColorChecker の cyan は、sRGB では表せない (色域外) のに、Display P3 なら表せます。</p>
+
+<div class="in-tool"><p><span class="label">このツールでは</span>: <code>--space</code> で色空間を選びます。対応表は <code>src/colorchart/spaces.py</code> の <code>SPACES</code> です。</p></div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section>
+<h2 id="lab">2. XYZ と Lab — 色を「見え方」で表す<a class="anchor" href="#lab" aria-label="この章へのリンク">#</a></h2>
+
+<p>RGB は「どの機械で、どう光らせるか」に依存します。そこで、<strong>人の目にどう見えるか</strong>で色を表す方法が作られました。</p>
+
+<h3 id="xyz">CIE XYZ<a class="anchor" href="#xyz" aria-label="この節へのリンク">#</a></h3>
+
+<ul>
+<li>CIE (国際照明委員会) が 1931 年に定めた、人の目の感度をもとにした色の表し方です</li>
+<li>どんな色空間の色も XYZ に変換できます。そのため、<strong>色空間どうしの通訳 (共通語)</strong> として使われます</li>
+<li>ただし、XYZ で数値が同じだけ離れていても、見た目の違いは同じになりません</li>
+</ul>
+
+<h3 id="cielab">CIE Lab (L*a*b*)<a class="anchor" href="#cielab" aria-label="この節へのリンク">#</a></h3>
+
+<p>XYZ を、<strong>数値の差が見た目の差に近くなるように</strong>作り変えたものです (1976 年)。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>軸</th><th>意味</th><th>範囲の目安</th></tr></thead>
+<tbody>
+<tr><td>L*</td><td>明るさ。0 = 黒、100 = 白</td><td>0〜100</td></tr>
+<tr><td>a*</td><td>赤み (+) ⇔ 緑み (−)</td><td>およそ −128〜+127</td></tr>
+<tr><td>b*</td><td>黄み (+) ⇔ 青み (−)</td><td>およそ −128〜+127</td></tr>
+</tbody>
+</table></div>
+
+<ul>
+<li><code>a* = b* = 0</code> なら、色みのない<strong>ニュートラル</strong> (グレー) です</li>
+<li>例: ColorChecker の cyan は <code>L*=49.57, a*=-29.71, b*=-28.32</code>。中くらいの明るさで、緑みと青みがある色です</li>
+<li>Lab は「どの白を基準にするか」(<a href="#white">3 章</a>) を決めないと値が決まりません</li>
+</ul>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: すべての基準値を Lab で持っています (<code>src/colorchart/patches.py</code> の <code>Patch.lab</code>)。
+<code>gray-ramp</code> は L* を 0〜100 で等間隔に並べたものなので、<strong>見た目の明るさが等間隔</strong>のグレーになります。</p>
+</div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section>
+<h2 id="white">3. 白色点と色順応<a class="anchor" href="#white" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="white-d50-d65">白色点 (D50 と D65)<a class="anchor" href="#white-d50-d65" aria-label="この節へのリンク">#</a></h3>
+
+<p>「白」にもいろいろあります。昼の青っぽい白と、夕方の黄色っぽい白は違う色です。
+色の世界では、基準になる白を<strong>標準イルミナント</strong> (標準の光) で表します。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>名前</th><th>おおよその色温度</th><th>どんな光か</th><th>主な使われ方</th></tr></thead>
+<tbody>
+<tr><td>D65</td><td>6500 K</td><td>曇り空の昼光。やや青み</td><td>sRGB・Display P3・Adobe RGB の白、ディスプレイ</td></tr>
+<tr><td>D50</td><td>5000 K</td><td>晴れた日の昼光。やや黄み</td><td>印刷、ICC の PCS (<a href="#icc">4 章</a>)</td></tr>
+</tbody>
+</table></div>
+
+<p class="note">(K = ケルビン。光の色を温度で表したもの。数字が大きいほど青白い)</p>
+
+<h3 id="adaptation">色順応 (chromatic adaptation)<a class="anchor" href="#adaptation" aria-label="この節へのリンク">#</a></h3>
+
+<p>人の目は、部屋の照明が多少黄色くても、白い紙を「白」と感じます。光に目が慣れるこの働きを<strong>色順応</strong>といいます。</p>
+
+<p>色の計算でも同じことをします。<strong>D65 の白を基準にした色を、D50 の白を基準にしたらどう見えるか</strong>に換算する計算です。
+この換算方法を <strong>CAT</strong> (Chromatic Adaptation Transform、色順応変換) といい、いくつか種類があります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>方法</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td><strong>Bradford</strong></td><td>ICC プロファイル (v4) が採用している標準的な方法</td></tr>
+<tr><td>CAT02</td><td>CIECAM02 という色の見えのモデルで使われる方法</td></tr>
+<tr><td>von Kries</td><td>古典的でシンプルな方法</td></tr>
+</tbody>
+</table></div>
+
+<p>方法が違うと、結果の数値がわずかに変わります。そのため、<strong>どの方法を使ったかを固定して記録すること</strong>が信頼性につながります。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: 基準の白は ICC D50、色順応は Bradford に統一しています (<code>spaces.py</code> の <code>D50_XY</code> と <code>CAT</code>)。
+D65 の色空間 (sRGB など) に書き出すときは、Bradford で D50 → D65 に換算しています。
+JSON の <code>reference_white</code> と <code>chromatic_adaptation</code> に、何を使ったかを記録しています。</p>
+</div>
+
+<h3 id="white-list">白色点の一覧<a class="anchor" href="#white-list" aria-label="この節へのリンク">#</a></h3>
+
+<p>D50・D65 のほかにも、よく使われる白があります。「D」は Daylight (昼光) の頭文字で、後ろの数字は色温度の上 2 桁です。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>名前</th><th>おおよその色温度</th><th>どんな光か</th><th>主な使われ方</th></tr></thead>
+<tbody>
+<tr><td>D50</td><td>5000 K</td><td>晴れた日の昼光。やや黄み</td><td>印刷、ICC の PCS。<strong>このツールの基準</strong></td></tr>
+<tr><td>D55</td><td>5500 K</td><td>D50 と D65 の中間の昼光</td><td>写真 (昼光用フィルム・ストロボ)</td></tr>
+<tr><td>D65</td><td>6500 K</td><td>曇り空の昼光。やや青み</td><td>ディスプレイ、sRGB、テレビ</td></tr>
+<tr><td>D75</td><td>7500 K</td><td>北向きの窓から入る空の光。青みが強い</td><td>色見本を比べる観察ブース</td></tr>
+<tr><td>A</td><td>2856 K</td><td>白熱電球。オレンジ色の強い光</td><td>室内照明の代表、測定器の検査</td></tr>
+<tr><td>C</td><td>約 6774 K</td><td>昔の昼光の標準 (D65 より前に使われた)</td><td>古い規格・古い測定値</td></tr>
+</tbody>
+</table></div>
+
+<p>色温度だけでなく、光にどの色 (波長) がどれだけ含まれるか (<strong>分光分布</strong>) も、それぞれ CIE が数表で決めています。
+A は赤い側の光が多く青い側が少ない、D65 は青い側も多い、という違いがあります。</p>
+
+<h3 id="spectral">分光反射率<a class="anchor" href="#spectral" aria-label="この節へのリンク">#</a></h3>
+
+<p>物の色は、物そのものだけでは決まりません。<strong>どんな光で照らすか</strong>と、<strong>物が光をどう跳ね返すか</strong>の組み合わせで決まります。</p>
+
+<ul>
+<li>光は、虹のように色 (波長) ごとに分けられます。人の目に見えるのはおよそ 380〜780 nm (ナノメートル) です</li>
+<li>物が、波長ごとに光を何 % 跳ね返すかを表したものを<strong>分光反射率</strong>といいます。たとえば赤い紙は、長い波長 (赤) をよく跳ね返し、短い波長 (青) はあまり跳ね返しません</li>
+<li>目に届く光 = 照明の分光分布 × 物の分光反射率。これを人の目の感度 (<a href="#observer">観測者</a>) で重み付けして足し合わせると、XYZ が計算できます</li>
+</ul>
+
+<pre><code>照明の光 (波長ごとの強さ) × 分光反射率 (波長ごとに何 % 跳ね返すか) ──▶ 目の感度で集計 ──▶ XYZ ──▶ Lab</code></pre>
+
+<p>分光反射率がわかっていれば、<strong>どんな照明の下の色でも計算で求められます</strong>。そのため、分光反射率は色の情報として最も詳しいものです。</p>
+
+<h3 id="methods">方法 A と方法 B<a class="anchor" href="#methods" aria-label="この節へのリンク">#</a></h3>
+
+<p>D50 の Lab 値を別の白色点 (たとえば照明 A) の値にしたいとき、2 つの方法があります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>方法 A (色順応で換算)</th><th>方法 B (分光から計算)</th></tr></thead>
+<tbody>
+<tr><th scope="row">やること</th><td>D50 の Lab を、Bradford の色順応で別の白に置き換える</td><td>分光反射率 × その照明の分光分布から計算し直す</td></tr>
+<tr><th scope="row">必要なデータ</th><td>Lab (または XYZ) だけ</td><td>分光反射率</td></tr>
+<tr><th scope="row">答えている問い</th><td>「目がその照明に慣れたとき、同じ見え方にするにはどの値か」</td><td>「その照明の下で実際に測ったら、どの値になるか」</td></tr>
+<tr><th scope="row">使える範囲</th><td>すべてのチャート</td><td>分光データがあるチャートだけ</td></tr>
+</tbody>
+</table></div>
+
+<p>2 つの答えは、D50 に近い白ではほぼ同じですが、D50 から離れるほどずれます。
+色順応は「白がずれた分を、すべての色に同じ割合で当てはめる」という<strong>近似</strong>なので、波長ごとの細かい違いまでは再現できないからです。
+特に照明 A は青い光がとても少ないため、青や紫の色ほどずれが大きくなります。</p>
+
+<p>参考までに、<code>babelcolor-avg</code> (24 色) で 2 つの方法の差を ΔE2000 (<a href="#delta-e">8 章</a>) で測ると、次のようになります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>白色点</th><th class="num">平均</th><th class="num">最大</th></tr></thead>
+<tbody>
+<tr><td>D50</td><td class="num">0.04</td><td class="num">0.17</td></tr>
+<tr><td>D65</td><td class="num">0.57</td><td class="num">1.38</td></tr>
+<tr><td>A</td><td class="num">1.60</td><td class="num">3.76</td></tr>
+</tbody>
+</table></div>
+
+<p>D50 の差が 0 でないのは、分光データと Lab の基準値が、別々に測られた値だからです。</p>
+
+<h3 id="observer">観測者<a class="anchor" href="#observer" aria-label="この節へのリンク">#</a></h3>
+
+<p>XYZ を計算するときに使う「人の目の感度」の数表を、<strong>標準観測者</strong>といいます。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>名前</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><strong>CIE 1931 2°</strong></td><td>視野 2° (腕を伸ばした先の親指の爪くらい) の小さな色を見たときの感度。最もよく使われる</td></tr>
+<tr><td>CIE 1964 10°</td><td>視野 10° の大きな色を見たときの感度</td></tr>
+</tbody>
+</table></div>
+
+<p>観測者が違うと、同じ分光データからでも XYZ が少し変わります。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: <code>whitepoints.py</code> に 6 種類の白色点 (<code>WHITE_POINTS</code>) があります。方法 A は <code>adapt_lab</code>、方法 B は <code>spectral_lab</code> です。
+観測者は CIE 1931 2° に統一しています (<code>OBSERVER</code>)。照明の分光分布と白色点の座標は、colour-science の CIE の定義から取っています。
+<code>colorchart reference</code> で作る一覧 (<a href="reports/charts.html">チャート一覧</a>) は、6 種類の白色点すべてについて Lab 値を載せています。</p>
+</div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section>
+<h2 id="icc">4. ICC プロファイルと PCS<a class="anchor" href="#icc" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="icc-profile">ICC プロファイル<a class="anchor" href="#icc-profile" aria-label="この節へのリンク">#</a></h3>
+
+<p>ICC (International Color Consortium) が定めた、<strong>「この画像・この機器の色はこう解釈してください」という説明書</strong>のファイルです。
+画像に埋め込むと、カラーマネジメント対応のソフトがそれを読み、正しい色で表示します。</p>
+
+<ul>
+<li>プロファイルが付いていない画像は、多くのソフトで sRGB とみなされます</li>
+<li>だから、Display P3 の画像にプロファイルが付いていないと、色がくすんで (または違って) 見えることがあります</li>
+</ul>
+
+<h3 id="pcs">PCS (Profile Connection Space)<a class="anchor" href="#pcs" aria-label="この節へのリンク">#</a></h3>
+
+<p>ICC の仕組みでは、色を変換するとき<strong>いったん共通の言葉 (PCS) を経由</strong>します。</p>
+
+<pre><code>カメラの RGB ──▶ PCS (D50 基準の XYZ / Lab) ──▶ ディスプレイの RGB</code></pre>
+
+<p>この PCS の白が <strong>D50</strong> と決められています。これが、印刷や色管理の世界で D50 がよく使われる理由です。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: 基準値を PCS と同じ「D50 基準の Lab」で持っています。
+<code>sRGB</code> を選んだときだけ、PNG に sRGB の ICC プロファイルを埋め込みます (<code>render.py</code> の <code>_icc_bytes</code>)。</p>
+</div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section>
+<h2 id="gamma">5. ガンマ (トーンカーブ)<a class="anchor" href="#gamma" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="gamma-eye">人の目は暗い部分の違いに敏感<a class="anchor" href="#gamma-eye" aria-label="この節へのリンク">#</a></h3>
+
+<p>光の強さが 2 倍になっても、人の目には「2 倍明るい」とは見えません。人の目は<strong>暗いところの変化に敏感</strong>です。</p>
+
+<p>そこで RGB 色空間では、光の強さをそのまま数値にせず、<strong>暗い部分に多くの段階を割り当てるカーブ</strong>をかけてから記録します。
+これを<strong>ガンマ</strong>、または<strong>トーンカーブ</strong>といいます。専門的には CCTF (Colour Component Transfer Function) と呼びます。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>呼び方</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>線形 (linear) な値</td><td>光の強さに比例した値。色の計算 (行列) はこちらで行う</td></tr>
+<tr><td>エンコード済み (非線形) の値</td><td>カーブをかけた値。画像ファイルに入っているのはこちら</td></tr>
+</tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>色空間</th><th>カーブ</th></tr></thead>
+<tbody>
+<tr><td>sRGB</td><td>暗部だけ直線、残りは約 2.4 乗のカーブ (全体として約 2.2 相当)</td></tr>
+<tr><td>Display P3</td><td>sRGB と同じカーブ</td></tr>
+<tr><td>Adobe RGB</td><td>約 2.2 乗 (正確には 563/256)</td></tr>
+</tbody>
+</table></div>
+
+<p>例: 明るさ L*=50 の中間グレーは、光の強さとしては白の約 18% ですが、sRGB のコード値では約 119 (255 の約 47%) になります。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: <code>lab_to_rgb</code> は <code>apply_cctf_encoding=True</code>、<code>rgb_to_lab</code> は <code>apply_cctf_decoding=True</code> として、カーブのかけ外しを colour-science に任せています。
+L*=50 が sRGB で 0.4664 (≒ 119/255) になることは、既知値テスト (<code>tests/test_spaces.py</code> の <code>test_srgb_mid_gray_known_value</code>) で確かめています。</p>
+</div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+<h2 id="matrix">6. 変換行列<a class="anchor" href="#matrix" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="matrix-3x3">XYZ ⇔ RGB は 3×3 の行列で計算する<a class="anchor" href="#matrix-3x3" aria-label="この節へのリンク">#</a></h3>
+
+<p>線形な RGB と XYZ は、3×3 の数表 (<strong>行列</strong>) を掛けることで互いに変換できます。この行列は、色空間の原色と白色点から計算で求まります。</p>
+
+<h3 id="derived-matrix">規格書の丸め行列と導出行列<a class="anchor" href="#derived-matrix" aria-label="この節へのリンク">#</a></h3>
+
+<p>ここに落とし穴があります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>種類</th><th>中身</th><th>問題</th></tr></thead>
+<tbody>
+<tr><td>規格書の行列</td><td>規格書に載っている、小数 4 桁で丸めた行列</td><td>丸めのせいで、白 (L*=100) が <code>R=0.99984, G=1.0001</code> のようにわずかにずれる。グレーにかすかな色が付く</td></tr>
+<tr><td>導出行列</td><td>原色と白色点から計算した、丸めていない行列</td><td>白・グレーが正確にニュートラル (R=G=B) になる</td></tr>
+</tbody>
+</table></div>
+
+<p>colour-science は、sRGB と Adobe RGB では規格書の行列を既定で使います。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: グレーの正確さを優先して、<strong>導出行列に統一</strong>しています (<code>spaces.py</code> の <code>_space</code> で <code>use_derived_transformation_matrices(True)</code>)。
+どの色空間でも L*=50 のグレーが R=G=B になることを、テスト (<code>test_neutral_gray_stays_neutral</code>) で確かめています。</p>
+</div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section>
+<h2 id="clip">7. 量子化とクリップ<a class="anchor" href="#clip" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="quantization">量子化 (quantization)<a class="anchor" href="#quantization" aria-label="この節へのリンク">#</a></h3>
+
+<p>計算で求めた RGB は <code>0.4664...</code> のような<strong>なめらかな数値</strong>です。画像ファイルには整数しか入らないので、段階のある値に丸めます。これを<strong>量子化</strong>といいます。</p>
+
+<ul>
+<li><strong>ビット深度</strong>: 1 色に何ビット使うか。8bit なら 2<sup>8</sup> = <strong>256 段階</strong> (0〜255)、16bit なら 65536 段階</li>
+<li>量子化すると、もとの値から最大で半段階ずれます。これが誤差 (ΔE) の主な原因です
+  <ul>
+  <li>8bit では ΔE2000 で 1.0 未満 (実測の最大は 0.6〜0.8 程度)。目で見て違いがわかるほどではありません</li>
+  <li>16bit では 0.01 未満 (実測の最大は 0.003 程度)。1 段階が 8bit の約 257 分の 1 になるためです</li>
+  </ul>
+</li>
+<li><strong>32bit (浮動小数)</strong>: 整数に丸めず、0〜1 の小数 (float32 = 有効数字およそ 7 桁の小数) のまま保存します。
+  ずれは ΔE2000 で 0.0001 未満 (実測の最大は 0.00001 程度) で、実質ゼロです</li>
+<li><strong>リニアとガンマ補正</strong>: 画像の値には普通、暗い部分を細かく表すために「ガンマ補正」(明るさを曲線で変換すること) がかけてあります。
+  EXR では補正をかけない<strong>リニア値</strong> (光の量に比例した値) で保存する決まりがあり、このツールも EXR だけリニアで書きます。
+  例: L*=50 のグレーは、ガンマ補正済みの sRGB では 0.466、リニアでは 0.184 になります</li>
+</ul>
+
+<h3 id="half-up">四捨五入の方式 (half-up)<a class="anchor" href="#half-up" aria-label="この節へのリンク">#</a></h3>
+
+<p>ちょうど半分 (x.5) のとき、どちらに丸めるかには流儀があります。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>方式</th><th class="num">126.5 の丸め</th><th class="num">127.5 の丸め</th><th>使われる場所</th></tr></thead>
+<tbody>
+<tr><td><strong>half-up</strong> (切り上げる四捨五入)</td><td class="num">127</td><td class="num">128</td><td>学校で習う四捨五入</td></tr>
+<tr><td>偶数丸め (banker's rounding)</td><td class="num">126</td><td class="num">128</td><td>Python の <code>round()</code>、NumPy の <code>np.round()</code></td></tr>
+</tbody>
+</table></div>
+
+<p>Python の <code>round()</code> をそのまま使うと、学校の四捨五入と結果が違うことがあります。流儀を決めて固定しないと、同じ色でもツールによってコード値が 1 ずれます。</p>
+
+<h3 id="clipping">クリップ (clip)<a class="anchor" href="#clipping" aria-label="この節へのリンク">#</a></h3>
+
+<p>色域外の色は、計算すると RGB が 0 未満や 1 を超えた値になります。
+例: ColorChecker の cyan を sRGB に変換すると <code>R = -0.178</code> になります。</p>
+
+<p>画像には 0〜1 の範囲しか入らないので、範囲の端に<strong>切り詰めます</strong> (<code>-0.178 → 0</code>)。これを<strong>クリップ</strong>といいます。
+クリップすると色が変わるので、ΔE が大きくなります (cyan は 3.4)。</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: <code>spaces.py</code> の <code>quantize</code> で、<code>floor(値 × 255 + 0.5)</code> という式で half-up の四捨五入をしています。
+クリップしたパッチには必ず <code>clipped: true</code> の印を付け、画面にも警告を出します。<strong>色域外を黙って丸めない</strong>のが約束事です。
+動きはテスト <code>test_quantize_half_up_and_clip_flag</code> で確かめています。</p>
+</div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section>
+<h2 id="delta-e">8. ΔE2000 — 色の差を測る<a class="anchor" href="#delta-e" aria-label="この章へのリンク">#</a></h2>
+
+<h3 id="delta-e-what">ΔE とは<a class="anchor" href="#delta-e-what" aria-label="この節へのリンク">#</a></h3>
+
+<p>2 つの色の違いを 1 つの数字で表したものです (Δ = 差、E = ドイツ語の Empfindung「感覚」)。小さいほど似た色です。</p>
+
+<h3 id="delta-e-history">計算方法の移り変わり<a class="anchor" href="#delta-e-history" aria-label="この節へのリンク">#</a></h3>
+
+<div class="table-wrap"><table>
+<thead><tr><th>名前</th><th>年</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td>ΔE*ab (CIE76)</td><td>1976</td><td>Lab 空間での単純な直線距離。鮮やかな色の差を大きく見積もりすぎる</td></tr>
+<tr><td>ΔE94 (CIE94)</td><td>1994</td><td>明るさ・鮮やかさ・色合いで重みを変えた</td></tr>
+<tr><td><strong>ΔE2000 (CIEDE2000)</strong></td><td>2001</td><td>さらに青の領域やグレー付近の補正を加え、人の見え方に最も近い。現在の標準</td></tr>
+</tbody>
+</table></div>
+
+<h3 id="delta-e-guide">目安<a class="anchor" href="#delta-e-guide" aria-label="この節へのリンク">#</a></h3>
+
+<div class="table-wrap"><table>
+<thead><tr><th>ΔE2000</th><th>見え方の目安</th></tr></thead>
+<tbody>
+<tr><td>1 未満</td><td>ほとんどの人が違いに気づかない</td></tr>
+<tr><td>1〜2</td><td>並べてよく見ると気づく</td></tr>
+<tr><td>2〜3.5</td><td>並べると違いがわかる</td></tr>
+<tr><td>5 以上</td><td>別の色に見える</td></tr>
+</tbody>
+</table></div>
+
+<p class="note">(あくまで目安です。色の種類や見る環境で変わります)</p>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: 基準の Lab と、コード値から計算し直した Lab の差を、colour-science の <code>delta_E(..., method="CIE 2000")</code> で計算しています (<code>spaces.py</code> の <code>encode</code>)。
+JSON ではパッチごとの値が <code>delta_e00</code>、全体の値が <code>summary.max_delta_e</code> と <code>summary.mean_delta_e</code> です。</p>
+</div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section>
+<h2 id="colorchecker">9. ColorChecker<a class="anchor" href="#colorchecker" aria-label="この章へのリンク">#</a></h2>
+
+<ul>
+<li>撮影や校正で世界中で使われている、<strong>24 色のパッチが並んだ実物のカード</strong>です。1976 年に Macbeth 社が発売しました (現在は Calibrite ブランド)</li>
+<li>肌色・空の青・植物の緑など、身の回りによくある色と、6 段のグレーでできています</li>
+<li><strong>2014 年 11 月に製造元が顔料の配合を変えた</strong>ため、それ以前と以後でパッチの基準値が少し違います。どちらの基準値を使ったかを区別する必要があります</li>
+<li>6 段のグレーには、<code>neutral 5 (.70 D)</code> のように<strong>濃度 (D)</strong> が名前に付いています。濃度は光をどれだけ吸収するかを表す数値で、大きいほど暗い色です</li>
+</ul>
+
+<div class="in-tool">
+<p><span class="label">このツールでは</span>: <code>colorchecker24</code> プリセットは、colour-science に収録されている「2014 年 11 月以降」の基準値 (D50 の xyY) を Lab に変換して使っています (<code>patches.py</code> の <code>colorchecker24</code>)。
+JSON の <code>source</code> に出典を書いています。基準値が正しく読み込めているかは、既知値テスト (<code>tests/test_patches_render.py</code>) で確かめています。</p>
+</div>
+
+<h3 id="charts">このツールのチャート<a class="anchor" href="#charts" aria-label="この節へのリンク">#</a></h3>
+
+<p>ColorChecker のほかにも、次のチャートを選べます (<code>--preset</code>)。各チャートの Lab 値は <a href="reports/charts.html">チャート一覧</a> で見られます。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>プリセット</th><th class="num">色数</th><th>どんなチャートか</th></tr></thead>
+<tbody>
+<tr><td><code>colorchecker24</code></td><td class="num">24</td><td>ColorChecker Classic。2014 年 11 月以降の配合の基準値</td></tr>
+<tr><td><code>colorchecker24-before</code></td><td class="num">24</td><td>同じカードの、2014 年 11 月より前の配合の基準値</td></tr>
+<tr><td><code>colorchecker-sg</code></td><td class="num">140</td><td><strong>ColorChecker Digital SG</strong>。デジタルカメラの校正用に、肌色や細かいグレーを増やした 140 色の版</td></tr>
+<tr><td><code>babelcolor-avg</code></td><td class="num">24</td><td>BabelColor 社が多数の ColorChecker 24 を測って平均した値。<strong>分光反射率のデータもある</strong>ので、<a href="#methods">方法 B</a> を計算できる</td></tr>
+<tr><td><code>te226</code></td><td class="num">45</td><td><strong>TE226</strong>。Image Engineering 社のカメラ評価用チャート (45 色)。出典の値は D65 基準なので、読み込むときに Bradford で D50 に換算している</td></tr>
+<tr><td><code>gray-ramp</code></td><td class="num">21</td><td>計算で作ったグレー。L* を 0〜100 で等間隔に並べたもの (<a href="#lab">2 章</a>)</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ 10 -->
+<section>
+<h2 id="reliability">10. このツールの信頼性の考え方<a class="anchor" href="#reliability" aria-label="この章へのリンク">#</a></h2>
+
+<p>ここまでの知識をもとに、colorchart がなぜこう作られているかをまとめます (ツールの <code>CLAUDE.md</code> の「色管理の約束事」を説明したものです)。</p>
+
+<h3 id="rule-1">約束 1. 基準値は Lab (D50) で持つ<a class="anchor" href="#rule-1" aria-label="この節へのリンク">#</a></h3>
+
+<p>RGB で持つと、色空間が変わるたびに値が変わります。<strong>見え方で決まる Lab</strong> で持てば、どの色空間に書き出しても同じ基準から出発できます。
+白を D50 にしているのは、ICC の PCS と同じにして、ほかの色管理ツールと話を合わせるためです。</p>
+
+<h3 id="rule-2">約束 2. 白と色順応の方法を固定する (D50 + Bradford)<a class="anchor" href="#rule-2" aria-label="この節へのリンク">#</a></h3>
+
+<p>方法を混ぜると、数値が少しずつずれて、どこでずれたのか追えなくなります。1 つに固定し、JSON に記録します。</p>
+
+<h3 id="rule-3">約束 3. 色変換は実績のあるライブラリ (colour-science) に任せる<a class="anchor" href="#rule-3" aria-label="この節へのリンク">#</a></h3>
+
+<p>行列や定数を自分で書き写すと、打ち間違いが起きます。広く使われ、検証されているライブラリを使います。
+自前で書く場合は、出典と検証テストを必ず付けます。</p>
+
+<h3 id="rule-4">約束 4. 導出行列を使う<a class="anchor" href="#rule-4" aria-label="この節へのリンク">#</a></h3>
+
+<p>規格書の丸め行列ではグレーにかすかな色が付きます。チャートのグレーは「本当にグレー」でなければならないので、導出行列を使います (<a href="#matrix">6 章</a>)。</p>
+
+<h3 id="rule-5">約束 5. 丸め方を固定し、色域外は必ず知らせる<a class="anchor" href="#rule-5" aria-label="この節へのリンク">#</a></h3>
+
+<p>half-up で丸め方を固定し、クリップしたら印を付けます。<strong>「黙って正しくない色を出す」ことが、チャートにとって最も危ない</strong>からです (<a href="#clip">7 章</a>)。</p>
+
+<h3 id="rule-6">約束 6. 往復して確かめ、結果を残す<a class="anchor" href="#rule-6" aria-label="この節へのリンク">#</a></h3>
+
+<pre><code>基準 Lab ──▶ RGB コード値 ──▶ (逆変換) ──▶ 実際の Lab
+   └──────────── ΔE2000 で比べる ◀────────────┘</code></pre>
+
+<p>作った値を逆方向に変換して基準と比べる (<strong>往復検証、round-trip</strong>) ことで、どれだけ正確に作れたかを数字で示します。
+その結果を PNG と一緒に JSON で残し、<strong>JSON の値が画像のピクセルと一致すること</strong>をテストで確かめています。</p>
+
+<h3 id="rule-7">約束 7. 追加したら必ずテストする<a class="anchor" href="#rule-7" aria-label="この節へのリンク">#</a></h3>
+
+<p>新しいプリセットや色空間を足すときは、次の 2 種類のテストを足します。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>テスト</th><th>何を確かめるか</th></tr></thead>
+<tbody>
+<tr><td>既知値テスト</td><td>広く知られた正解の値と一致するか (例: L*=50 → sRGB 0.4664)</td></tr>
+<tr><td>往復テスト</td><td>変換して戻したら元の値に戻るか</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ 用語索引 -->
+<section>
+<h2 id="glossary">用語索引<a class="anchor" href="#glossary" aria-label="用語索引へのリンク">#</a></h2>
+
+<div class="table-wrap"><table>
+<thead><tr><th>用語</th><th>一言で</th><th>章</th></tr></thead>
+<tbody>
+<tr><td>A (照明 A)</td><td>白熱電球の光 (2856 K) を表す標準イルミナント</td><td><a href="#white-list">3</a></td></tr>
+<tr><td>Adobe RGB</td><td>写真・印刷向けの広い RGB 色空間</td><td><a href="#color-space">1</a></td></tr>
+<tr><td>BabelColor Average</td><td>多数の ColorChecker を測った平均値。分光データ付き</td><td><a href="#charts">9</a></td></tr>
+<tr><td>Bradford</td><td>ICC が採用している色順応の計算方法</td><td><a href="#white">3</a></td></tr>
+<tr><td>C (照明 C)</td><td>昔の昼光の標準イルミナント</td><td><a href="#white-list">3</a></td></tr>
+<tr><td>CAT</td><td>色順応変換。白の違いを換算する計算</td><td><a href="#white">3</a></td></tr>
+<tr><td>CCTF</td><td>ガンマ (トーンカーブ) の正式名</td><td><a href="#gamma">5</a></td></tr>
+<tr><td>CIE</td><td>国際照明委員会。色の基準を決める団体</td><td><a href="#lab">2</a></td></tr>
+<tr><td>CIE 1931 2°</td><td>最もよく使われる標準観測者</td><td><a href="#observer">3</a></td></tr>
+<tr><td>ColorChecker</td><td>24 色の校正用カード</td><td><a href="#colorchecker">9</a></td></tr>
+<tr><td>ColorChecker SG</td><td>140 色のデジタルカメラ校正用 ColorChecker</td><td><a href="#charts">9</a></td></tr>
+<tr><td>D50 / D65</td><td>基準の白 (5000 K / 6500 K の昼光)</td><td><a href="#white">3</a></td></tr>
+<tr><td>D55 / D75</td><td>5500 K / 7500 K の昼光の白</td><td><a href="#white-list">3</a></td></tr>
+<tr><td>Display P3</td><td>Apple 製品などの広色域ディスプレイ向け色空間</td><td><a href="#color-space">1</a></td></tr>
+<tr><td>TE226</td><td>Image Engineering 社の 45 色のカメラ評価用チャート</td><td><a href="#charts">9</a></td></tr>
+<tr><td>half-up</td><td>x.5 を常に切り上げる四捨五入</td><td><a href="#half-up">7</a></td></tr>
+<tr><td>ICC プロファイル</td><td>色の解釈のしかたを伝える説明書ファイル</td><td><a href="#icc">4</a></td></tr>
+<tr><td>Lab (L*a*b*)</td><td>見た目の差に近い数値で色を表す方法</td><td><a href="#lab">2</a></td></tr>
+<tr><td>PCS</td><td>ICC で色を変換するときの共通の言葉 (D50 基準)</td><td><a href="#pcs">4</a></td></tr>
+<tr><td>sRGB</td><td>一般的なモニター・Web の標準色空間</td><td><a href="#color-space">1</a></td></tr>
+<tr><td>XYZ</td><td>人の目の感度に基づく色の表し方。色空間の通訳</td><td><a href="#xyz">2</a></td></tr>
+<tr><td>ΔE2000</td><td>人の見え方に近い色の差</td><td><a href="#delta-e">8</a></td></tr>
+<tr><td>ガンマ</td><td>暗部に多くの段階を割り当てるカーブ</td><td><a href="#gamma">5</a></td></tr>
+<tr><td>色温度</td><td>光の色を温度 (K) で表したもの。大きいほど青白い</td><td><a href="#white">3</a></td></tr>
+<tr><td>往復検証 (round-trip)</td><td>変換して戻し、元と比べて確かめること</td><td><a href="#rule-6">10</a></td></tr>
+<tr><td>観測者 (標準観測者)</td><td>XYZ の計算に使う、人の目の感度の数表</td><td><a href="#observer">3</a></td></tr>
+<tr><td>クリップ</td><td>範囲外の値を端に切り詰めること</td><td><a href="#clipping">7</a></td></tr>
+<tr><td>コード値</td><td>画像に書き込まれる整数 (8bit なら 0〜255)</td><td><a href="#rgb-numbers">1</a></td></tr>
+<tr><td>色域</td><td>色空間が表せる色の範囲</td><td><a href="#gamut">1</a></td></tr>
+<tr><td>色空間</td><td>RGB の数字を色に結び付ける約束</td><td><a href="#color-space">1</a></td></tr>
+<tr><td>色順応</td><td>光の色に目が慣れる働き。またその換算</td><td><a href="#adaptation">3</a></td></tr>
+<tr><td>白色点</td><td>「何を白とみなすか」の基準</td><td><a href="#white">3</a></td></tr>
+<tr><td>導出行列</td><td>原色と白色点から計算した、丸めていない変換行列</td><td><a href="#derived-matrix">6</a></td></tr>
+<tr><td>ニュートラル</td><td>色みがない (a*=b*=0、R=G=B) こと</td><td><a href="#lab">2</a></td></tr>
+<tr><td>ビット深度</td><td>1 色あたりの段階数を決めるビット数</td><td><a href="#quantization">7</a></td></tr>
+<tr><td>分光反射率</td><td>物が波長ごとに光を何 % 跳ね返すか</td><td><a href="#spectral">3</a></td></tr>
+<tr><td>分光分布</td><td>光に波長ごとの強さがどれだけ含まれるか</td><td><a href="#white-list">3</a></td></tr>
+<tr><td>方法 A / 方法 B</td><td>色順応で換算した値 / 分光から計算した値</td><td><a href="#methods">3</a></td></tr>
+<tr><td>量子化</td><td>なめらかな値を段階のある整数に丸めること</td><td><a href="#quantization">7</a></td></tr>
+</tbody>
+</table></div>
+</section>
+
+<p class="top-link"><a href="#top">↑ ページの先頭へ</a></p>
+</main>
+
+<footer>
+  色の変換・計算は <a href="https://www.colour-science.org/">colour-science</a> によります。
+  ツール本体: <a href="https://github.com/2JO-code/dev-colormanagement">dev-colormanagement</a>
+</footer>
+
+</div>
+</body>
+</html>
