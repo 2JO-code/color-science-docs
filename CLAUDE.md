@@ -21,6 +21,8 @@
 - `assets/style.css` — index / knowledge 共通の見た目 (色はすべて `:root` の変数。ダークモード対応)
 - `reports/` — ツールが自動生成するレポート (HTML + JSON)。**手で編集しない**。
   作り直しはツール側で `colorchart reference --out ../color-science-docs/reports/charts.html` など
+- `tools/` — ツールが自動生成する、ブラウザで動くページ (HTML + JSON)。**手で編集しない**。
+  `lab-rgb.html` (Lab ⇔ RGB 変換) は、ツール側で `colorchart converter --out ../color-science-docs/tools/lab-rgb.html`
 
 ## 書き方の約束
 

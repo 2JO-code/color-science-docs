@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab ⇔ RGB 変換</title>
+<style>
+:root{color-scheme:light;--bg:#fcfcfb;--surface:#ffffff;--text:#0b0b0b;--text-2:#52514e;--muted:#8a8984;--border:#dcdbd6;--accent:#2a62b8;--accent-bg:#e6eefb;--warn:#a3480b;--warn-bg:#fbeee4;--ok:#2c7a3f;--ok-bg:#e5f3e8;--input:#ffffff;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1a1a19;--surface:#232322;--text:#f0efec;--text-2:#c3c2b7;--muted:#8f8e86;--border:#3a3a37;--accent:#7fb0f0;--accent-bg:#22314a;--warn:#f0a56b;--warn-bg:#3d2a1c;--ok:#7fcf92;--ok-bg:#1f3325;--input:#1a1a19;}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#1a1a19;--surface:#232322;--text:#f0efec;--text-2:#c3c2b7;--muted:#8f8e86;--border:#3a3a37;--accent:#7fb0f0;--accent-bg:#22314a;--warn:#f0a56b;--warn-bg:#3d2a1c;--ok:#7fcf92;--ok-bg:#1f3325;--input:#1a1a19;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.7 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
+
+main{max-width:960px;margin:0 auto;padding:24px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:1.45rem;line-height:1.35;margin:0 0 4px}
+h2{font-size:1.1rem;margin:32px 0 8px;padding-top:12px;border-top:1px solid var(--border)}
+h3{font-size:1rem;margin:0 0 8px}
+p,li{color:var(--text-2)}
+p{margin:4px 0}
+.lead{color:var(--text)}
+.note{font-size:.85rem}
+.kref{font-size:.8rem;white-space:nowrap}
+span.kref{color:var(--muted)}
+.site{font-size:.85rem;margin:0 0 12px}
+.settings{display:flex;flex-wrap:wrap;gap:8px 20px;margin:16px 0;padding:12px;
+border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.settings label{display:flex;flex-direction:column;gap:2px;font-size:.85rem;color:var(--text-2)}
+select,input{font:inherit;color:var(--text);background:var(--input);
+border:1px solid var(--border);border-radius:6px;padding:4px 6px}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);
+outline-offset:1px}
+.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:720px){.panels{grid-template-columns:minmax(0,1fr)}}
+.panel{padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+min-width:0}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.fields label{display:flex;flex-direction:column;gap:2px;font-size:.85rem;color:var(--text-2)}
+.fields input{width:100%;font-variant-numeric:tabular-nums}
+.fields input[aria-invalid="true"]{border-color:var(--warn)}
+.error{min-height:1.2em;margin:4px 0;font-size:.85rem;color:var(--warn)}
+.result{display:flex;gap:12px;align-items:flex-start;margin-top:8px}
+.swatch{flex:none;width:88px;height:88px;border-radius:8px;
+box-shadow:inset 0 0 0 1px rgb(128 128 128 / .35)}
+.out{min-width:0;flex:1;margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);
+gap:2px 10px;font-size:.88rem}
+.out dt{color:var(--muted)}
+.out dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;color:var(--text)}
+.big{font-size:1.05rem;font-weight:600}
+.badge{display:inline-block;font-size:.78rem;padding:1px 8px;border-radius:999px}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+button{font:inherit;font-size:.85rem;margin-top:10px;padding:4px 10px;cursor:pointer;
+color:var(--accent);background:transparent;border:1px solid var(--accent);border-radius:6px}
+button:hover{background:var(--accent-bg)}
+.check{margin:12px 0 0;padding:8px 12px;border-radius:8px;font-size:.88rem}
+.check.ok{background:var(--ok-bg);color:var(--ok)}
+.check.warn{background:var(--warn-bg);color:var(--warn)}
+ol.steps{padding-left:1.4em} ol.steps li{margin:2px 0}
+dl.cards{display:grid;gap:8px;margin:8px 0;
+grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.card{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.card dt{font-weight:600} .card dd{margin:2px 0 0;font-size:.85rem;color:var(--text-2)}
+dl.meta{display:flex;flex-wrap:wrap;gap:4px 16px;margin:8px 0 0;font-size:.8rem;color:var(--muted)}
+.meta div{display:flex;gap:6px} .meta dd{margin:0;color:var(--text-2)}
+</style>
+</head>
+<body>
+<main>
+<p class="site"><a href="https://2jo-code.github.io/color-science-docs/">color-science-docs</a></p>
+<h1>Lab ⇔ RGB 変換</h1>
+<p class="lead">Lab の値から RGB のコード値を、RGB のコード値から Lab を求めます。
+計算はすべてこのブラウザの中で行い、入力した値はどこにも送信しません。</p>
+<dl class="meta">
+<div><dt>基準の白</dt><dd>ICC D50</dd></div>
+<div><dt>色順応</dt><dd>Bradford</dd></div>
+<div><dt>計算の数値</dt><dd>colour-science 0.4.7</dd></div>
+<div><dt>作成</dt><dd>colorchart 0.1.0 /
+2026-11-20T13:38:51+00:00 (UTC)</dd></div>
+</dl>
+
+<div class="settings">
+<label>RGB 色空間 <select id="space"><option value="srgb" selected>sRGB</option><option value="display-p3">Display P3</option><option value="adobe-rgb">Adobe RGB (1998)</option></select></label>
+<label>bit 深度 <select id="bits"><option value="8" selected>8bit (0〜255)</option><option value="16">16bit (0〜65535)</option><option value="32">32bit float (0〜1)</option></select></label>
+<label>Lab の白色点 <select id="white"><option value="D50" selected>D50 — 印刷・ICC プロファイルの標準 (このツールの基準)</option><option value="D55">D55 — 写真用の昼光 (やや暖かい昼の光)</option><option value="D65">D65 — ディスプレイ・sRGB・テレビの標準</option><option value="D75">D75 — 北空の昼光 (青みのある光)</option><option value="A">A — 白熱電球 (約 2856 K の暖かい光)</option><option value="C">C — 古い昼光の標準 (旧規格の測定値で使われる)</option></select></label>
+</div>
+
+<div class="panels">
+<section class="panel" aria-labelledby="h-lab">
+<h3 id="h-lab">Lab → RGB</h3>
+<div class="fields">
+<label>L* <input id="lab-l" type="number" inputmode="decimal" step="any" value="50"></label>
+<label>a* <input id="lab-a" type="number" inputmode="decimal" step="any" value="20"></label>
+<label>b* <input id="lab-b" type="number" inputmode="decimal" step="any" value="-30"></label>
+</div>
+<p class="error" id="lab-error" role="alert"></p>
+<div id="lab-out">
+<div class="result">
+<div class="swatch" id="lab-swatch" role="img" aria-label="変換した色の見本"></div>
+<dl class="out">
+<dt>RGB</dt><dd class="big" id="lab-code"></dd>
+<dt>色域</dt><dd id="lab-clip"></dd>
+<dt>ΔE2000</dt><dd id="lab-de"></dd>
+</dl>
+</div>
+<dl class="out" style="margin-top:8px">
+<dt>入力の白</dt><dd id="lab-white"></dd>
+<dt>Lab (D50)</dt><dd id="lab-d50"></dd>
+<dt>0〜1 (丸め前)</dt><dd id="lab-rgb01"></dd>
+<dt>戻した Lab (D50)</dt><dd id="lab-actual"></dd>
+</dl>
+<button type="button" id="to-rgb">この RGB を右の入力へ →</button>
+</div>
+</section>
+
+<section class="panel" aria-labelledby="h-rgb">
+<h3 id="h-rgb">RGB → Lab</h3>
+<div class="fields">
+<label>R <input id="rgb-r" type="number" inputmode="decimal"
+min="0" max="255" step="1" value="128"></label>
+<label>G <input id="rgb-g" type="number" inputmode="decimal"
+min="0" max="255" step="1" value="64"></label>
+<label>B <input id="rgb-b" type="number" inputmode="decimal"
+min="0" max="255" step="1" value="200"></label>
+</div>
+<p class="error" id="rgb-error" role="alert"></p>
+<div id="rgb-out">
+<div class="result">
+<div class="swatch" id="rgb-swatch" role="img" aria-label="入力した色の見本"></div>
+<dl class="out">
+<dt>Lab (<span id="rgb-white"></span>)</dt><dd class="big" id="rgb-lab"></dd>
+</dl>
+</div>
+<dl class="out" style="margin-top:8px">
+<dt>Lab (D50)</dt><dd id="rgb-d50"></dd>
+<dt>0〜1</dt><dd id="rgb-rgb01"></dd>
+</dl>
+<button type="button" id="to-lab">← この Lab を左の入力へ</button>
+</div>
+</section>
+</div>
+
+<p class="check" id="self-check" role="status">自己チェック中…
+(JavaScript が動かないと変換できません)</p>
+
+<h2>表示の見方</h2>
+<ul>
+<li><b>RGB</b>: 選んだ色空間・bit 深度のコード値です。ガンマ補正済み (画像ファイルに入る値) です。
+<a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#gamma">詳しく</a></li>
+<li><b>色域</b>: 「範囲外」のときは、その色空間で表せない色なので 0 か最大値に切り詰めています
+(クリップ)。そのぶん色が変わり、ΔE2000 が大きくなります。<a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#clipping">詳しく</a></li>
+<li><b>ΔE2000</b>: 入力の Lab と、丸めた RGB から逆算した Lab の差です。
+四捨五入 (量子化) のずれだけなら 8bit でも 0.5 未満がふつうです。<a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#delta-e">詳しく</a></li>
+<li><b>Lab (D50)</b>: このツールの基準の白 (ICC D50) で表した Lab です。D50 以外の白を選んだときは、
+Bradford 色順応で D50 に換算してから RGB を計算します。<a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#adaptation">詳しく</a></li>
+<li><b>色見本</b>: 選んだ色空間のまま表示します。モニターがその色域に対応していない場合や、
+古いブラウザでは正しい色になりません。正確な値は数値で確かめてください。</li>
+</ul>
+
+<h2>計算の流れ</h2>
+<ol class="steps">
+<li>Lab (選んだ白) → XYZ → Bradford 色順応で D50 の XYZ へ</li>
+<li>XYZ (D50) → リニア RGB (3×3 の行列。原色と白色点から導出した行列に、
+D50 → 色空間の白の色順応を掛け合わせたもの) <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#derived-matrix">詳しく</a></li>
+<li>ガンマ補正 (sRGB・Display P3 は IEC 61966-2-1 の式、Adobe RGB は 563/256 乗)</li>
+<li>0〜1 にクリップしてコード値へ。8/16bit は四捨五入 (half-up)、32bit は float32 に丸める
+<a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#half-up">詳しく</a></li>
+<li>コード値から逆の順で Lab を求め、入力との ΔE2000 を計算</li>
+</ol>
+<p class="note">RGB → Lab は 5 → 1 の逆の順です。</p>
+
+<h2>この計算を信頼できる理由</h2>
+<ul>
+<li>行列・白色点・ガンマの指数は、Python の色計算ライブラリ colour-science
+0.4.7 で作り、このページに埋め込んでいます。
+ページの JavaScript は計算式だけを持ちます。</li>
+<li>ページを開くたびに、Python で計算した答え 210 件 (色域外の色を含む) と
+このページの結果を照合し、上に結果を表示します。</li>
+<li>開発時のテストで、ランダムな数百色について 3 つの色空間 × 6 つの白色点 × 3 つの bit 深度の
+両方向で、Python のツール (colorchart) と結果が一致することを確かめています。</li>
+<li>使った数値はすべて、このページと同じ名前の JSON ファイル (拡張子 .json) に入っています。</li>
+</ul>
+
+<h2>用語</h2>
+<p class="note">ここでは一言だけ説明しています。考え方はナレッジにまとめています。</p>
+<dl class="cards"><div class="card"><dt>Lab (L*a*b*)</dt><dd>色を見え方で表す 3 つの数。L* は明るさ (0 = 黒、100 = 白)、a* は赤 (+) ⇔ 緑 (−)、b* は黄 (+) ⇔ 青 (−)。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#cielab">詳しく</a></dd></div><div class="card"><dt>色域</dt><dd>その RGB 色空間で表せる色の範囲。範囲の外の色は RGB の 0〜最大値に収まらない。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#gamut">詳しく</a></dd></div><div class="card"><dt>白色点</dt><dd>「何を白とみなすか」の基準。同じ色でも、基準の白が変わると Lab の数値が変わる。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#white-list">詳しく</a></dd></div><div class="card"><dt>色順応</dt><dd>白の基準が違う Lab どうしを換算する計算。このツールは Bradford 法で統一。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#adaptation">詳しく</a></dd></div><div class="card"><dt>ガンマ</dt><dd>明るさの数値を、目の感じ方に合わせて曲げる処理。画像の RGB はふつう補正済み。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#gamma">詳しく</a></dd></div><div class="card"><dt>量子化</dt><dd>連続した値を 0〜255 などの整数にすること。四捨五入 (half-up) で丸める。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#quantization">詳しく</a></dd></div><div class="card"><dt>クリップ</dt><dd>表せる範囲を超えた値を端 (0 か最大値) に切り詰めること。色が変わる。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#clipping">詳しく</a></dd></div><div class="card"><dt>ΔE2000</dt><dd>2 つの色の違いを表す数。1 前後が「やっと違いがわかる」目安。 <a class="kref" href="https://2jo-code.github.io/color-science-docs/knowledge.html#delta-e">詳しく</a></dd></div></dl>
+</main>
+<script type="application/json" id="params">{"tool":"colorchart","version":"0.1.0","generated_at":"2026-11-20T13:38:51+00:00","colour_science":"0.4.7","reference_white":"ICC D50","chromatic_adaptation":"Bradford","observer":"CIE 1931 2 Degree Standard Observer","bit_depths":[8,16,32],"spaces":[{"key":"srgb","name":"sRGB","css":"srgb","whitepoint_xy":[0.3127,0.329],"xyz_d50_to_rgb":[[3.1341863642368204,-1.6172089589982728,-0.4906940640063844],[-0.9787485041906939,1.9161300967735853,0.03343339915999544],[0.07196392780224686,-0.22899387345320335,1.405753732896448]],"rgb_to_xyz_d50":[[0.4360412516160506,0.3851129107981551,0.14304583758579326],[0.22248454022947728,0.7169050786084573,0.060610381162065165],[0.013920187471375339,0.09706723869712384,0.7139125738314989]],"transfer":{"type":"srgb","source":"IEC 61966-2-1 (colour.models.eotf_inverse_sRGB)"}},{"key":"display-p3","name":"Display P3","css":"display-p3","whitepoint_xy":[0.3127,0.329],"xyz_d50_to_rgb":[[2.4039840048901473,-0.9899068991718833,-0.39764150605308984],[-0.8422229263070573,1.7988437375484247,0.016035407924400565],[0.04820585191968955,-0.09740675376971832,1.27400493556644]],"rgb_to_xyz_d50":[[0.5151187009280956,0.29197783204137423,0.1571034670305291],[0.2411891678374028,0.6922440506378197,0.06656678152477752],[-0.001050452707976706,0.04187912006015115,0.7840713326478236]],"transfer":{"type":"srgb","source":"IEC 61966-2-1 (colour.models.eotf_inverse_sRGB)"}},{"key":"adobe-rgb","name":"Adobe RGB (1998)","css":"a98-rgb","whitepoint_xy":[0.3127,0.329],"xyz_d50_to_rgb":[[1.9625165395511914,-0.6106511397119444,-0.3413835710065611],[-0.978748504190694,1.916130096773585,0.03343339915999544],[0.028714556840654923,-0.14069639117161503,1.349266354062139]],"rgb_to_xyz_d50":[[0.6097407888011513,0.2052725603827148,0.14918665081613267],[0.31111253477236234,0.6256751416615322,0.0632123235661054],[0.019465374107608565,0.06087450682168843,0.744560119070701]],"transfer":{"type":"gamma","encode_exponent":0.4547069271758437,"decode_exponent":2.19921875,"source":"colour-science RGB_COLOURSPACES['Adobe RGB (1998)'].cctf_encoding / decoding"}}],"white_points":[{"key":"D50","note":"印刷・ICC プロファイルの標準 (このツールの基準)","xy":[0.345702914918791,0.358538596679933],"xyz":[0.964199999999999,1.0,0.8248999999999981],"to_d50":[[1.0,5.3173775684827274e-17,-1.073982940586315e-17],[5.017207657087596e-17,0.9999999999999999,5.311157527770498e-18],[-2.854605551064276e-19,-4.1619331756284515e-18,1.0]],"from_d50":[[1.0,5.3173775684827274e-17,-1.073982940586315e-17],[5.017207657087596e-17,0.9999999999999999,5.311157527770498e-18],[-2.854605551064276e-19,-4.1619331756284515e-18,1.0]]},{"key":"D55","note":"写真用の昼光 (やや暖かい昼の光)","xy":[0.33243,0.34744],"xyz":[0.9567982961086806,1.0,0.9213965001151279],"to_d50":[[1.0184872578036195,0.009401257355362347,-0.021367706766640772],[0.012046623248085614,0.9951433129876699,-0.007238470717512169],[-0.003976886225314015,0.006506045467622594,0.8923400863730662]],"from_d50":[[0.9820513881743304,-0.009430818208557288,0.023439405794095813],[-0.011855676071450284,1.0049409525489967,0.007867972262208124],[0.004463141650330638,-0.007369047878722844,1.120696068389628]]},{"key":"D65","note":"ディスプレイ・sRGB・テレビの標準","xy":[0.3127,0.329],"xyz":[0.9504559270516716,1.0,1.0890577507598784],"to_d50":[[1.0478860032225499,0.02291876517477926,-0.05021609531173324],[0.02958178249800293,0.9904835184905489,-0.01707870770448272],[-0.009251880839208922,0.01507260748703147,0.7516781336176016]],"from_d50":[[0.9555125889283479,-0.023072975173043183,0.06330908471330228],[-0.028324759310118314,1.0099429264007949,0.021054438751389102],[0.012328703174821414,-0.020535307654303565,1.3307136899175922]]},{"key":"D75","note":"北空の昼光 (青みのある光)","xy":[0.29903,0.31488],"xyz":[0.9496633638211383,1.0,1.2261496443089432],"to_d50":[[1.0700139410531955,0.03210956618513331,-0.06855819366860595],[0.04164951531182196,0.9891193994536386,-0.02338411008742994],[-0.012537712786781816,0.020362328386761264,0.665860225056871]],"from_d50":[[0.9369446097687557,-0.032378371864571376,0.0953324559906371],[-0.039007273687728376,1.0116178918978898,0.03151039082533338],[0.018834915885889814,-0.03154542898533338,1.5026481360129769]]},{"key":"A","note":"白熱電球 (約 2856 K の暖かい光)","xy":[0.44758,0.40745],"xyz":[1.098490612345073,1.0,0.35579825745490257],"to_d50":[[0.8779730087566044,-0.09151496858573742,0.256521381602934],[-0.11172690095206447,1.0924352981632557,0.08514840374909659],[0.05017989807940099,-0.08372657826275483,2.398843764439403]],"from_d50":[[1.1573380003143963,0.0872293984564836,-0.12685669295011578],[0.11992544513002736,0.9219413737061939,-0.04554914280587504],[-0.020023878355014315,0.030353720961158865,0.4179313371361975]]},{"key":"C","note":"古い昼光の標準 (旧規格の測定値で使われる)","xy":[0.31006,0.31616],"xyz":[0.980705971659919,1.0,1.1822494939271255],"to_d50":[[1.0377423905482435,0.015414786231217932,-0.05830828944365792],[0.017095558516299233,1.0055940878375682,-0.018912931896541658],[-0.012021028407362489,0.020449729998728194,0.6904121072063468]],"from_d50":[[0.9648397759775834,-0.016437979015179866,0.08103459652989954],[-0.016077805514874404,0.9941572798418906,0.025875791290521557],[0.017275411327290498,-0.029732748234675112,1.4490547830767726]]}],"samples":{"preset":"colorchecker24","lab_to_rgb":[{"space":"srgb","bit_depth":8,"lab_d50":[37.54,14.369999999999994,14.92],"code":[116,79,65],"clipped":false,"delta_e":0.2560027595},{"space":"srgb","bit_depth":8,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[197,144,127],"clipped":false,"delta_e":0.154253888},{"space":"srgb","bit_depth":8,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[91,120,155],"clipped":false,"delta_e":0.179852306},{"space":"srgb","bit_depth":8,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[91,108,64],"clipped":false,"delta_e":0.2071959204},{"space":"srgb","bit_depth":8,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[131,127,175],"clipped":false,"delta_e":0.1375586472},{"space":"srgb","bit_depth":8,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[95,189,172],"clipped":false,"delta_e":0.0840056041},{"space":"srgb","bit_depth":8,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[224,124,48],"clipped":false,"delta_e":0.040613121},{"space":"srgb","bit_depth":8,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[69,90,167],"clipped":false,"delta_e":0.1504234555},{"space":"srgb","bit_depth":8,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[197,80,95],"clipped":false,"delta_e":0.0568907726},{"space":"srgb","bit_depth":8,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[93,58,104],"clipped":false,"delta_e":0.0702438711},{"space":"srgb","bit_depth":8,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[156,187,58],"clipped":false,"delta_e":0.0236227316},{"space":"srgb","bit_depth":8,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[227,161,39],"clipped":false,"delta_e":0.0897465163},{"space":"srgb","bit_depth":8,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[40,62,145],"clipped":false,"delta_e":0.1351948591},{"space":"srgb","bit_depth":8,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[61,147,70],"clipped":false,"delta_e":0.0586551746},{"space":"srgb","bit_depth":8,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[178,54,57],"clipped":false,"delta_e":0.0741163588},{"space":"srgb","bit_depth":8,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[236,199,15],"clipped":false,"delta_e":0.1273120074},{"space":"srgb","bit_depth":8,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[191,79,146],"clipped":false,"delta_e":0.1096670913},{"space":"srgb","bit_depth":8,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[0,133,165],"clipped":true,"delta_e":3.4049550957},{"space":"srgb","bit_depth":8,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[241,242,235],"clipped":false,"delta_e":0.4179108188},{"space":"srgb","bit_depth":8,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[201,202,201],"clipped":false,"delta_e":0.1359012341},{"space":"srgb","bit_depth":8,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[161,163,163],"clipped":false,"delta_e":0.2073921582},{"space":"srgb","bit_depth":8,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[121,121,121],"clipped":false,"delta_e":0.2480828603},{"space":"srgb","bit_depth":8,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[83,84,85],"clipped":false,"delta_e":0.3918979861},{"space":"srgb","bit_depth":8,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[50,50,50],"clipped":false,"delta_e":0.4781091241},{"space":"srgb","bit_depth":8,"lab_d50":[50.0,-100.0,-80.0],"code":[0,156,255],"clipped":true,"delta_e":28.7166720292},{"space":"srgb","bit_depth":8,"lab_d50":[90.0,-80.0,90.0],"code":[39,255,0],"clipped":true,"delta_e":2.178991597},{"space":"srgb","bit_depth":8,"lab_d50":[30.0,60.0,-110.0],"code":[0,30,253],"clipped":true,"delta_e":1.8160092857},{"space":"srgb","bit_depth":16,"lab_d50":[37.54,14.369999999999994,14.92],"code":[29737,20378,16703],"clipped":false,"delta_e":0.0006761948},{"space":"srgb","bit_depth":16,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[50690,36917,32542],"clipped":false,"delta_e":0.0008046361},{"space":"srgb","bit_depth":16,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[23345,30923,39898],"clipped":false,"delta_e":0.0004623803},{"space":"srgb","bit_depth":16,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[23509,27824,16376],"clipped":false,"delta_e":0.0003723604},{"space":"srgb","bit_depth":16,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[33702,32650,44868],"clipped":false,"delta_e":0.0006403499},{"space":"srgb","bit_depth":16,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[24505,48511,44134],"clipped":false,"delta_e":0.0005994356},{"space":"srgb","bit_depth":16,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[57588,31905,12401],"clipped":false,"delta_e":0.0005140334},{"space":"srgb","bit_depth":16,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[17621,23014,42984],"clipped":false,"delta_e":0.0005885116},{"space":"srgb","bit_depth":16,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[50704,20544,24428],"clipped":false,"delta_e":0.0004264427},{"space":"srgb","bit_depth":16,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[23872,14847,26700],"clipped":false,"delta_e":0.0003416125},{"space":"srgb","bit_depth":16,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[40111,48077,14955],"clipped":false,"delta_e":0.000514344},{"space":"srgb","bit_depth":16,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[58439,41453,10061],"clipped":false,"delta_e":0.0005881624},{"space":"srgb","bit_depth":16,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[10212,15825,37323],"clipped":false,"delta_e":0.0006874419},{"space":"srgb","bit_depth":16,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[15574,37795,18023],"clipped":false,"delta_e":0.0002365349},{"space":"srgb","bit_depth":16,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[45793,13773,14579],"clipped":false,"delta_e":0.0003100055},{"space":"srgb","bit_depth":16,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[60747,51270,3762],"clipped":false,"delta_e":0.0005776635},{"space":"srgb","bit_depth":16,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[49147,20249,37632],"clipped":false,"delta_e":0.0003399342},{"space":"srgb","bit_depth":16,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[0,34122,42451],"clipped":true,"delta_e":3.4619937571},{"space":"srgb","bit_depth":16,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[61938,62102,60504],"clipped":false,"delta_e":0.0015422924},{"space":"srgb","bit_depth":16,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[51677,51972,51671],"clipped":false,"delta_e":0.0011880683},{"space":"srgb","bit_depth":16,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[41448,41932,41839],"clipped":false,"delta_e":0.000699748},{"space":"srgb","bit_depth":16,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[31015,31070,30991],"clipped":false,"delta_e":0.0011217535},{"space":"srgb","bit_depth":16,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[21264,21596,21723],"clipped":false,"delta_e":0.0023890528},{"space":"srgb","bit_depth":16,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[12734,12763,12941],"clipped":false,"delta_e":0.0004429437},{"space":"srgb","bit_depth":16,"lab_d50":[50.0,-100.0,-80.0],"code":[0,39991,65535],"clipped":true,"delta_e":28.7768820458},{"space":"srgb","bit_depth":16,"lab_d50":[90.0,-80.0,90.0],"code":[9934,65535,0],"clipped":true,"delta_e":2.1827730768},{"space":"srgb","bit_depth":16,"lab_d50":[30.0,60.0,-110.0],"code":[0,7646,64918],"clipped":true,"delta_e":1.7958741324},{"space":"display-p3","bit_depth":8,"lab_d50":[37.54,14.369999999999994,14.92],"code":[110,81,67],"clipped":false,"delta_e":0.3829360662},{"space":"display-p3","bit_depth":8,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[189,146,130],"clipped":false,"delta_e":0.1327622046},{"space":"display-p3","bit_depth":8,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[97,119,152],"clipped":false,"delta_e":0.3152968426},{"space":"display-p3","bit_depth":8,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[95,108,69],"clipped":false,"delta_e":0.0971359756},{"space":"display-p3","bit_depth":8,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[130,127,171],"clipped":false,"delta_e":0.1500669292},{"space":"display-p3","bit_depth":8,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[119,187,172],"clipped":false,"delta_e":0.2219493201},{"space":"display-p3","bit_depth":8,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[211,129,66],"clipped":false,"delta_e":0.1132019333},{"space":"display-p3","bit_depth":8,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[73,89,162],"clipped":false,"delta_e":0.044424789},{"space":"display-p3","bit_depth":8,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[183,87,97],"clipped":false,"delta_e":0.1279422731},{"space":"display-p3","bit_depth":8,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[88,59,101],"clipped":false,"delta_e":0.1614961796},{"space":"display-p3","bit_depth":8,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[162,186,80],"clipped":false,"delta_e":0.040344667},{"space":"display-p3","bit_depth":8,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[218,164,68],"clipped":false,"delta_e":0.1689396283},{"space":"display-p3","bit_depth":8,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[44,61,140],"clipped":false,"delta_e":0.1134658892},{"space":"display-p3","bit_depth":8,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[84,145,79],"clipped":false,"delta_e":0.13885476},{"space":"display-p3","bit_depth":8,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[164,63,61],"clipped":false,"delta_e":0.1226242441},{"space":"display-p3","bit_depth":8,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[230,201,69],"clipped":false,"delta_e":0.1791542534},{"space":"display-p3","bit_depth":8,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[178,86,144],"clipped":false,"delta_e":0.1004481706},{"space":"display-p3","bit_depth":8,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[16,130,162],"clipped":false,"delta_e":0.2604626579},{"space":"display-p3","bit_depth":8,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[241,242,236],"clipped":false,"delta_e":0.3868076821},{"space":"display-p3","bit_depth":8,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[201,202,201],"clipped":false,"delta_e":0.0829841985},{"space":"display-p3","bit_depth":8,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[162,163,163],"clipped":false,"delta_e":0.4102452145},{"space":"display-p3","bit_depth":8,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[121,121,121],"clipped":false,"delta_e":0.2480828603},{"space":"display-p3","bit_depth":8,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[83,84,84],"clipped":false,"delta_e":0.3191279704},{"space":"display-p3","bit_depth":8,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[50,50,50],"clipped":false,"delta_e":0.4781091241},{"space":"display-p3","bit_depth":8,"lab_d50":[50.0,-100.0,-80.0],"code":[0,149,248],"clipped":true,"delta_e":26.0462922084},{"space":"display-p3","bit_depth":8,"lab_d50":[90.0,-80.0,90.0],"code":[125,255,63],"clipped":true,"delta_e":0.5928781655},{"space":"display-p3","bit_depth":8,"lab_d50":[30.0,60.0,-110.0],"code":[0,28,242],"clipped":true,"delta_e":1.6168605984},{"space":"display-p3","bit_depth":16,"lab_d50":[37.54,14.369999999999994,14.92],"code":[28349,20773,17321],"clipped":false,"delta_e":0.0003922593},{"space":"display-p3","bit_depth":16,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[48608,37482,33300],"clipped":false,"delta_e":0.0013180956},{"space":"display-p3","bit_depth":16,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[24901,30708,39118],"clipped":false,"delta_e":0.00094267},{"space":"display-p3","bit_depth":16,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[24344,27694,17657],"clipped":false,"delta_e":0.0007142085},{"space":"display-p3","bit_depth":16,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[33519,32686,43961],"clipped":false,"delta_e":0.0006679108},{"space":"display-p3","bit_depth":16,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[30619,47950,44227],"clipped":false,"delta_e":0.000752219},{"space":"display-p3","bit_depth":16,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[54154,33194,16973],"clipped":false,"delta_e":0.0012909332},{"space":"display-p3","bit_depth":16,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[18715,22859,41637],"clipped":false,"delta_e":0.0004368102},{"space":"display-p3","bit_depth":16,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[47095,22441,24943],"clipped":false,"delta_e":0.0007948212},{"space":"display-p3","bit_depth":16,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[22579,15249,26008],"clipped":false,"delta_e":0.0008318256},{"space":"display-p3","bit_depth":16,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[41670,47840,20590],"clipped":false,"delta_e":0.000577245},{"space":"display-p3","bit_depth":16,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[55907,42164,17456],"clipped":false,"delta_e":0.0005152328},{"space":"display-p3","bit_depth":16,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[11430,15675,35995],"clipped":false,"delta_e":0.00105572},{"space":"display-p3","bit_depth":16,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[21716,37309,20267],"clipped":false,"delta_e":0.0004063846},{"space":"display-p3","bit_depth":16,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[42262,16234,15763],"clipped":false,"delta_e":0.0004289192},{"space":"display-p3","bit_depth":16,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[59209,51622,17832],"clipped":false,"delta_e":0.0005693341},{"space":"display-p3","bit_depth":16,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[45666,22040,36951],"clipped":false,"delta_e":0.0001742962},{"space":"display-p3","bit_depth":16,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[4230,33495,41544],"clipped":false,"delta_e":0.0012385418},{"space":"display-p3","bit_depth":16,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[61967,62096,60647],"clipped":false,"delta_e":0.0012715132},{"space":"display-p3","bit_depth":16,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[51730,51963,51693],"clipped":false,"delta_e":0.0010151469},{"space":"display-p3","bit_depth":16,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[41534,41916,41839],"clipped":false,"delta_e":0.0013158407},{"space":"display-p3","bit_depth":16,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[31025,31068,30997],"clipped":false,"delta_e":0.0016104443},{"space":"display-p3","bit_depth":16,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[21323,21585,21706],"clipped":false,"delta_e":0.0019167623},{"space":"display-p3","bit_depth":16,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[12739,12762,12925],"clipped":false,"delta_e":0.0014450111},{"space":"display-p3","bit_depth":16,"lab_d50":[50.0,-100.0,-80.0],"code":[0,38410,63790],"clipped":true,"delta_e":25.993220538},{"space":"display-p3","bit_depth":16,"lab_d50":[90.0,-80.0,90.0],"code":[32100,65535,16310],"clipped":true,"delta_e":0.5953328419},{"space":"display-p3","bit_depth":16,"lab_d50":[30.0,60.0,-110.0],"code":[0,7139,62307],"clipped":true,"delta_e":1.6424188256},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[37.54,14.369999999999994,14.92],"code":[107,80,68],"clipped":false,"delta_e":0.5345936989},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[183,142,126],"clipped":false,"delta_e":0.2392199192},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[100,120,153],"clipped":false,"delta_e":0.3719747236},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[97,108,68],"clipped":false,"delta_e":0.1533805591},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[129,126,171],"clipped":false,"delta_e":0.140502468},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[130,187,171],"clipped":false,"delta_e":0.1508980007},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[201,123,57],"clipped":false,"delta_e":0.1506506603},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[77,90,163],"clipped":false,"delta_e":0.1866013985},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[173,81,95],"clipped":false,"delta_e":0.1347335783},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[85,60,102],"clipped":false,"delta_e":0.1157799721},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[164,186,72],"clipped":false,"delta_e":0.1923067385},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[210,160,55],"clipped":false,"delta_e":0.1215985285},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[51,64,142],"clipped":false,"delta_e":0.1022353402},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[96,146,77],"clipped":false,"delta_e":0.115390679},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[154,56,59],"clipped":false,"delta_e":0.0878830986},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[226,198,50],"clipped":false,"delta_e":0.1081066783},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[167,80,143],"clipped":false,"delta_e":0.0719761835},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[56,132,163],"clipped":false,"delta_e":0.1451769377},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[241,241,235],"clipped":false,"delta_e":0.3366861123},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[200,201,200],"clipped":false,"delta_e":0.1356927287},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[160,162,161],"clipped":false,"delta_e":0.665420093},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[120,120,120],"clipped":false,"delta_e":0.2388274518},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[84,85,85],"clipped":false,"delta_e":0.3525960764},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[53,53,54],"clipped":false,"delta_e":0.3309128453},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[50.0,-100.0,-80.0],"code":[0,154,254],"clipped":true,"delta_e":22.7057267739},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[90.0,-80.0,90.0],"code":[151,255,38],"clipped":true,"delta_e":1.3892497188},{"space":"adobe-rgb","bit_depth":8,"lab_d50":[30.0,60.0,-110.0],"code":[0,35,248],"clipped":true,"delta_e":1.4851279973},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[37.54,14.369999999999994,14.92],"code":[27377,20637,17369],"clipped":false,"delta_e":0.0007956714},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[64.66,19.27000000000001,17.500000000000004],"code":[46912,36580,32482],"clipped":false,"delta_e":0.0004785845},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[49.31999999999999,-3.81999999999999,-22.53999999999998],"code":[25766,30717,39210],"clipped":false,"delta_e":0.0011079128},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[43.46000000000001,-12.740000000000002,22.719999999999995],"code":[24855,27721,17519],"clipped":false,"delta_e":0.0010988677},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[54.94,9.610000000000007,-24.79],"code":[33136,32398,44059],"clipped":false,"delta_e":0.001248637},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[70.48,-32.26000000000001,-0.37000000000002586],"code":[33395,48140,43937],"clipped":false,"delta_e":0.0004464558},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[62.72999999999999,35.83000000000003,56.49999999999993],"code":[51597,31672,14624],"clipped":false,"delta_e":0.0004079971},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[39.43,10.750000000000009,-45.17000000000001],"code":[19666,23125,42002],"clipped":false,"delta_e":0.0005013176},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[50.56999999999999,48.640000000000015,16.67000000000002],"code":[44337,20794,24331],"clipped":false,"delta_e":0.0001948172},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[30.1,22.540000000000006,-20.86999999999999],"code":[21931,15503,26291],"clipped":false,"delta_e":0.0009830561},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[71.77,-24.129999999999928,58.18999999999998],"code":[42192,47703,18413],"clipped":false,"delta_e":0.0003920029},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[71.51,18.239999999999977,67.37000000000002],"code":[54005,41071,14143],"clipped":false,"delta_e":0.0003896021},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[28.370000000000005,15.41999999999999,-49.8],"code":[13006,16402,36399],"clipped":false,"delta_e":0.000289463},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[54.379999999999995,-39.71999999999998,32.269999999999975],"code":[24622,37446,19680],"clipped":false,"delta_e":0.0006773465},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[42.43000000000001,51.04999999999998,28.620000000000033],"code":[39556,14520,15227],"clipped":false,"delta_e":0.0004664268},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[81.8,2.6700000000000057,80.41000000000005],"code":[58040,50928,12912],"clipped":false,"delta_e":0.0008944125},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[50.629999999999995,51.279999999999994,-14.119999999999976],"code":[42995,20516,36771],"clipped":false,"delta_e":0.0004317914},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[49.56999999999999,-29.710000000000015,-28.32000000000001],"code":[14302,33835,41764],"clipped":false,"delta_e":0.0005420087},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[95.19,-1.0299999999999754,2.929999999999988],"code":[61872,61992,60418],"clipped":false,"delta_e":0.0009560385},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[81.29,-0.5700000000000149,0.43999999999999595],"code":[51426,51640,51347],"clipped":false,"delta_e":0.0004687791},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[66.89,-0.7499999999999729,-0.05999999999999339],"code":[41204,41548,41459],"clipped":false,"delta_e":0.0008925402},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[50.75999999999999,-0.130000000000019,0.13999999999998458],"code":[30822,30860,30786],"clipped":false,"delta_e":0.0002728805},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[35.63,-0.4599999999999882,-0.48000000000001375],"code":[21561,21784,21899],"clipped":false,"delta_e":0.0032943604},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[20.640000000000008,0.06999999999995898,-0.45999999999999375],"code":[13583,13602,13757],"clipped":false,"delta_e":0.001104226},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[50.0,-100.0,-80.0],"code":[0,39619,65178],"clipped":true,"delta_e":22.609899604},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[90.0,-80.0,90.0],"code":[38837,65535,9865],"clipped":true,"delta_e":1.3928492236},{"space":"adobe-rgb","bit_depth":16,"lab_d50":[30.0,60.0,-110.0],"code":[0,9035,63685],"clipped":true,"delta_e":1.4710982398}],"rgb_to_lab":[{"space":"srgb","bit_depth":8,"white":"D50","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"srgb","bit_depth":8,"white":"D50","code":[255,255,255],"lab":[100.0,0.0,-0.0]},{"space":"srgb","bit_depth":8,"white":"D50","code":[128,128,128],"lab":[53.5850134522,0.0,0.0]},{"space":"srgb","bit_depth":8,"white":"D50","code":[255,0,0],"lab":[54.2896318653,80.8143557742,69.8897420923]},{"space":"srgb","bit_depth":8,"white":"D50","code":[0,255,0],"lab":[87.8194064315,-79.2749422135,80.9927234325]},{"space":"srgb","bit_depth":8,"white":"D50","code":[0,0,255],"lab":[29.5659393352,68.2862082761,-112.0329192532]},{"space":"srgb","bit_depth":8,"white":"D50","code":[200,120,40],"lab":[58.4559720834,27.8285324547,54.5877999236]},{"space":"srgb","bit_depth":8,"white":"D50","code":[30,90,160],"lab":[37.3886130676,1.071006592,-44.2460372509]},{"space":"srgb","bit_depth":8,"white":"D65","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"srgb","bit_depth":8,"white":"D65","code":[255,255,255],"lab":[100.0,0.0,-0.0]},{"space":"srgb","bit_depth":8,"white":"D65","code":[128,128,128],"lab":[53.5850134522,0.0,-0.0]},{"space":"srgb","bit_depth":8,"white":"D65","code":[255,0,0],"lab":[53.2371155954,80.0901135231,67.2032635117]},{"space":"srgb","bit_depth":8,"white":"D65","code":[0,255,0],"lab":[87.7355191097,-86.1815968904,83.1866202736]},{"space":"srgb","bit_depth":8,"white":"D65","code":[0,0,255],"lab":[32.300872904,79.1952703074,-107.8554655397]},{"space":"srgb","bit_depth":8,"white":"D65","code":[200,120,40],"lab":[57.9107355045,25.2910666905,54.0829471928]},{"space":"srgb","bit_depth":8,"white":"D65","code":[30,90,160],"lab":[38.0674006155,7.138081138,-43.3270243634]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[255,255,255],"lab":[100.0,0.0,0.0]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[128,128,128],"lab":[53.5850134522,-0.0,0.0]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[255,0,0],"lab":[56.2066598191,94.4753519208,98.8912840538]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[0,255,0],"lab":[86.6150512893,-106.5447359111,102.8661907852]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[0,0,255],"lab":[31.0121928552,70.4535984479,-115.5888210119]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[200,120,40],"lab":[59.0424308078,35.1386274538,67.9592923749]},{"space":"display-p3","bit_depth":8,"white":"D50","code":[30,90,160],"lab":[37.3548814702,-1.6933186199,-47.5046359206]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[255,255,255],"lab":[100.0,0.0,-0.0]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[128,128,128],"lab":[53.5850134522,0.0,0.0]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[255,0,0],"lab":[54.9665570965,94.0925463329,94.7699260285]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[0,255,0],"lab":[86.5900661238,-115.2804920293,107.6780339475]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[0,0,255],"lab":[33.8339326515,81.7089118589,-111.2787757789]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[200,120,40],"lab":[58.4013094132,32.5424639104,67.459444266]},{"space":"display-p3","bit_depth":8,"white":"D65","code":[30,90,160],"lab":[38.1226133211,5.2167890924,-46.4406296447]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[255,255,255],"lab":[100.0,0.0,0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[128,128,128],"lab":[53.9885697454,0.0,0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[255,0,0],"lab":[62.6014381548,90.3707192488,78.15426109]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[0,255,0],"lab":[83.214303847,-129.0926921496,87.1695594805]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[0,0,255],"lab":[30.2088585496,69.2497024127,-113.6136639384]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[200,120,40],"lab":[61.8823414719,36.9019991011,64.076717115]},{"space":"adobe-rgb","bit_depth":8,"white":"D50","code":[30,90,160],"lab":[35.7573716704,-5.1827423635,-49.1841448424]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[0,0,0],"lab":[0.0,0.0,0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[255,255,255],"lab":[100.0,0.0,-0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[128,128,128],"lab":[53.9885697454,0.0,0.0]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[255,0,0],"lab":[61.4244609777,89.5608347609,75.1501042264]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[0,255,0],"lab":[83.3034690814,-137.9733650018,90.8362089327]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[0,0,255],"lab":[32.9823810593,80.3126874333,-109.3772678373]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[200,120,40],"lab":[61.2299840651,34.335545404,63.4128862583]},{"space":"adobe-rgb","bit_depth":8,"white":"D65","code":[30,90,160],"lab":[36.594529792,2.479968797,-47.9993199585]}]}}</script>
+<script>/*
+ * Lab ⇔ RGB 変換の計算部分 (colorchart が変換ページの HTML に埋め込む)。
+ *
+ * 行列・白色点・ガンマの指数などの数値は持たず、すべて引数 params (Python 側の
+ * colorchart.converter.converter_params() が colour-science から作ったもの) から受け取る。
+ * ここに書くのは計算式だけで、式の出典は各関数のコメントに書く。
+ * 結果が Python (colorchart.spaces / whitepoints) と一致することは tests/test_converter.py で確かめる。
+ *
+ * 画面 (DOM) は触らない。ブラウザでは ColorConvert、Node では require() で使う。
+ */
+var ColorConvert = (function () {
+  "use strict";
+
+  function mul(m, v) {
+    return [
+      m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+      m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+      m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+    ];
+  }
+
+  function find(list, key, what) {
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i];
+    throw new Error("unknown " + what + ": " + key);
+  }
+
+  // --- Lab ⇔ XYZ (CIE 15:2018 / colour-science の XYZ_to_Lab・Lab_to_XYZ と同じ式) ---
+  // 境目 (24/116)^3 と傾き 841/108 は CIE の定義どおりの分数で書く
+  function fwd(t) {
+    return t > Math.pow(24 / 116, 3) ? Math.cbrt(t) : (841 / 108) * t + 16 / 116;
+  }
+  function inv(f) {
+    return f > 24 / 116 ? f * f * f : (f - 16 / 116) * (108 / 841);
+  }
+  function xyzToLab(xyz, wxyz) {
+    var fx = fwd(xyz[0] / wxyz[0]), fy = fwd(xyz[1] / wxyz[1]), fz = fwd(xyz[2] / wxyz[2]);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+  }
+  function labToXyz(lab, wxyz) {
+    var fy = (lab[0] + 16) / 116, fx = fy + lab[1] / 500, fz = fy - lab[2] / 200;
+    return [wxyz[0] * inv(fx), wxyz[1] * inv(fy), wxyz[2] * inv(fz)];
+  }
+
+  // --- ガンマ補正 (トーンカーブ) ---
+  // sRGB 型 (sRGB・Display P3): IEC 61966-2-1 の区分式 (colour.models.eotf_inverse_sRGB / eotf_sRGB)
+  // べき乗型 (Adobe RGB): 指数は params の値 (colour-science の定義から取ったもの)
+  // マイナス (色域外) は符号を外してかけ、符号を戻す (spaces._mirrored と同じ。NaN にしない)
+  function mirrored(fn, v) {
+    return v < 0 ? -fn(-v) : fn(v);
+  }
+  function encodeFn(tr) {
+    if (tr.type === "srgb") {
+      return function (l) { return l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055; };
+    }
+    if (tr.type === "gamma") {
+      return function (l) { return Math.pow(l, tr.encode_exponent); };
+    }
+    throw new Error("unknown transfer: " + tr.type);
+  }
+  function decodeFn(tr) {
+    if (tr.type === "srgb") {
+      return function (v) { return v <= 0.0031308 * 12.92 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    }
+    if (tr.type === "gamma") {
+      return function (v) { return Math.pow(v, tr.decode_exponent); };
+    }
+    throw new Error("unknown transfer: " + tr.type);
+  }
+
+  // --- ΔE2000 (Sharma, Wu, Dalal 2005 / colour.difference.delta_E_CIE2000 と同じ手順) ---
+  function rad(d) { return (d * Math.PI) / 180; }
+  function hue(b, a) {
+    if (a === 0 && b === 0) return 0;
+    var h = (Math.atan2(b, a) * 180) / Math.PI;
+    return ((h % 360) + 360) % 360;
+  }
+  function deltaE2000(lab1, lab2) {
+    var L1 = lab1[0], a1 = lab1[1], b1 = lab1[2];
+    var L2 = lab2[0], a2 = lab2[1], b2 = lab2[2];
+    var Cbar = (Math.hypot(a1, b1) + Math.hypot(a2, b2)) / 2;
+    var Cbar7 = Math.pow(Cbar, 7);
+    var G = 0.5 * (1 - Math.sqrt(Cbar7 / (Cbar7 + Math.pow(25, 7))));
+    var ap1 = (1 + G) * a1, ap2 = (1 + G) * a2;
+    var Cp1 = Math.hypot(ap1, b1), Cp2 = Math.hypot(ap2, b2);
+    var hp1 = hue(b1, ap1), hp2 = hue(b2, ap2);
+    var dLp = L2 - L1, dCp = Cp2 - Cp1;
+    var dh = hp2 - hp1, CC = Cp1 * Cp2, dhp;
+    if (CC === 0) dhp = 0;
+    else if (Math.abs(dh) <= 180) dhp = dh;
+    else if (dh > 180) dhp = dh - 360;
+    else dhp = dh + 360;
+    var dHp = 2 * Math.sqrt(CC) * Math.sin(rad(dhp / 2));
+    var Lbp = (L1 + L2) / 2, Cbp = (Cp1 + Cp2) / 2;
+    var adh = Math.abs(hp1 - hp2), sh = hp1 + hp2, hbp;
+    if (CC === 0) hbp = sh;
+    else if (adh <= 180) hbp = sh / 2;
+    else if (sh < 360) hbp = (sh + 360) / 2;
+    else hbp = (sh - 360) / 2;
+    var T = 1 - 0.17 * Math.cos(rad(hbp - 30)) + 0.24 * Math.cos(rad(2 * hbp)) +
+      0.32 * Math.cos(rad(3 * hbp + 6)) - 0.2 * Math.cos(rad(4 * hbp - 63));
+    var dTheta = 30 * Math.exp(-Math.pow((hbp - 275) / 25, 2));
+    var Cbp7 = Math.pow(Cbp, 7);
+    var RC = 2 * Math.sqrt(Cbp7 / (Cbp7 + Math.pow(25, 7)));
+    var Lb2 = Math.pow(Lbp - 50, 2);
+    var SL = 1 + (0.015 * Lb2) / Math.sqrt(20 + Lb2);
+    var SC = 1 + 0.045 * Cbp;
+    var SH = 1 + 0.015 * Cbp * T;
+    var RT = -Math.sin(rad(2 * dTheta)) * RC;
+    var l = dLp / SL, c = dCp / SC, h = dHp / SH;
+    return Math.sqrt(l * l + c * c + h * h + RT * c * h);
+  }
+
+  // --- 量子化 (spaces.quantize / to_float32 と同じ) ---
+  var CLIP_TOL = 1e-9; // spaces._clip_flags と同じ許容幅
+  function clip01(v) { return Math.min(1, Math.max(0, v)); }
+  function isClipped(rgb) {
+    for (var i = 0; i < 3; i++) if (rgb[i] < -CLIP_TOL || rgb[i] > 1 + CLIP_TOL) return true;
+    return false;
+  }
+  function maxCode(bits) { return bits === 32 ? 1 : Math.pow(2, bits) - 1; }
+  function quantize(rgb, bits) {
+    if (bits === 32) return rgb.map(function (v) { return Math.fround(clip01(v)); }); // float32 に丸める
+    var vmax = maxCode(bits);
+    return rgb.map(function (v) { return Math.floor(clip01(v) * vmax + 0.5); }); // half-up 四捨五入
+  }
+  function codeTo01(code, bits) {
+    if (bits === 32) return code.slice();
+    var vmax = maxCode(bits);
+    return code.map(function (v) { return v / vmax; });
+  }
+
+  // --- 変換の本体 ---
+  // 基準白は ICC D50。選んだ白色点の Lab は Bradford 行列 (params) で D50 へ移してから計算する
+  function labToD50(params, lab, white) {
+    var w = find(params.white_points, white, "white point");
+    var d50 = find(params.white_points, "D50", "white point");
+    if (white === "D50") return lab.slice();
+    return xyzToLab(mul(w.to_d50, labToXyz(lab, w.xyz)), d50.xyz);
+  }
+  function d50ToLab(params, labD50, white) {
+    var w = find(params.white_points, white, "white point");
+    var d50 = find(params.white_points, "D50", "white point");
+    if (white === "D50") return labD50.slice();
+    return xyzToLab(mul(w.from_d50, labToXyz(labD50, d50.xyz)), w.xyz);
+  }
+  function rgb01ToLabD50(params, rgb, sp) {
+    var dec = decodeFn(sp.transfer);
+    var lin = rgb.map(function (v) { return mirrored(dec, v); });
+    var d50 = find(params.white_points, "D50", "white point");
+    return xyzToLab(mul(sp.rgb_to_xyz_d50, lin), d50.xyz);
+  }
+
+  /*
+   * Lab (白色点 white が基準) -> RGB コード値。
+   * 戻り値:
+   *   lab_d50    D50 に換算した入力 Lab
+   *   rgb        ガンマ補正済み 0..1 (クリップ前。色域外は 0 未満・1 超え)
+   *   code       コード値 (8/16bit は整数、32 は float32 の 0..1)
+   *   clipped    色域外でクリップしたか
+   *   lab_actual コード値から逆算した Lab (D50)
+   *   delta_e    lab_d50 と lab_actual の ΔE2000 (spaces.encode と同じく D50 どうしで比べる)
+   */
+  function labToRgb(params, lab, spaceKey, white, bits) {
+    var sp = find(params.spaces, spaceKey, "space");
+    var labD50 = labToD50(params, lab, white);
+    var d50 = find(params.white_points, "D50", "white point");
+    var lin = mul(sp.xyz_d50_to_rgb, labToXyz(labD50, d50.xyz));
+    var enc = encodeFn(sp.transfer);
+    var rgb = lin.map(function (v) { return mirrored(enc, v); });
+    var code = quantize(rgb, bits);
+    var labActual = rgb01ToLabD50(params, codeTo01(code, bits), sp);
+    return {
+      lab_d50: labD50,
+      rgb: rgb,
+      code: code,
+      clipped: isClipped(rgb),
+      lab_actual: labActual,
+      delta_e: deltaE2000(labD50, labActual),
+    };
+  }
+
+  /*
+   * RGB コード値 -> Lab (白色点 white が基準)。
+   * 戻り値: rgb (0..1)、lab_d50、lab (white 基準)
+   */
+  function rgbToLab(params, code, spaceKey, white, bits) {
+    var sp = find(params.spaces, spaceKey, "space");
+    var rgb = codeTo01(code, bits);
+    var labD50 = rgb01ToLabD50(params, rgb, sp);
+    return { rgb: rgb, lab_d50: labD50, lab: d50ToLab(params, labD50, white) };
+  }
+
+  /*
+   * 埋め込まれた答え (Python で計算した samples) と照合する。ページを開いたときに使う。
+   * コード値とクリップは完全一致、ΔE・Lab は tol 以内なら一致とみなす。
+   */
+  function selfCheck(params, tol) {
+    tol = tol || 1e-6;
+    var s = params.samples, total = 0, failures = [];
+    s.lab_to_rgb.forEach(function (c) {
+      total++;
+      var r = labToRgb(params, c.lab_d50, c.space, "D50", c.bit_depth);
+      var ok = r.clipped === c.clipped && Math.abs(r.delta_e - c.delta_e) <= tol &&
+        r.code.every(function (v, i) { return v === c.code[i]; });
+      if (!ok) failures.push({ kind: "lab_to_rgb", expected: c, got: r });
+    });
+    s.rgb_to_lab.forEach(function (c) {
+      total++;
+      var r = rgbToLab(params, c.code, c.space, c.white, c.bit_depth);
+      var ok = r.lab.every(function (v, i) { return Math.abs(v - c.lab[i]) <= tol; });
+      if (!ok) failures.push({ kind: "rgb_to_lab", expected: c, got: r });
+    });
+    return { total: total, passed: total - failures.length, failures: failures };
+  }
+
+  return {
+    labToRgb: labToRgb,
+    rgbToLab: rgbToLab,
+    labToD50: labToD50,
+    d50ToLab: d50ToLab,
+    deltaE2000: deltaE2000,
+    maxCode: maxCode,
+    selfCheck: selfCheck,
+  };
+})();
+
+if (typeof module !== "undefined" && module.exports) module.exports = ColorConvert;
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = JSON.parse(document.getElementById("params").textContent);
+  var C = ColorConvert;
+  function $(id) { return document.getElementById(id); }
+  function fix(v, d) { return (Object.is(v, -0) ? 0 : v).toFixed(d).replace(/^-(0\.0+)$/, "$1"); }
+  function settings() {
+    return { space: $("space").value, white: $("white").value, bits: Number($("bits").value) };
+  }
+  function spaceInfo(key) { return P.spaces.filter(function (s) { return s.key === key; })[0]; }
+  function fmtCode(v, bits) { return bits === 32 ? fix(v, 7) : String(v); }
+  function swatch(el, rgb01, space) {
+    var c = rgb01.map(function (v) { return Math.min(1, Math.max(0, v)).toFixed(6); });
+    el.style.background = "color(" + spaceInfo(space).css + " " + c.join(" ") + ")";
+  }
+  function readNumber(input, min, max, integer, label, errors) {
+    var raw = input.value.trim(), v = Number(raw);
+    var bad = raw === "" || !isFinite(v) || v < min || v > max || (integer && !Number.isInteger(v));
+    input.setAttribute("aria-invalid", bad ? "true" : "false");
+    if (bad) {
+      var kind = integer ? " の整数" : " の数";
+      errors.push(label + " は " + min + "〜" + max + kind + "で入力してください");
+    }
+    return v;
+  }
+
+  function updateLab() {
+    var s = settings(), errors = [];
+    var lab = [
+      readNumber($("lab-l"), 0, 100, false, "L*", errors),
+      readNumber($("lab-a"), -200, 200, false, "a*", errors),
+      readNumber($("lab-b"), -200, 200, false, "b*", errors),
+    ];
+    $("lab-error").textContent = errors.join(" / ");
+    $("lab-out").hidden = errors.length > 0;
+    if (errors.length) return;
+    var r = C.labToRgb(P, lab, s.space, s.white, s.bits);
+    $("lab-code").textContent = r.code.map(function (v) { return fmtCode(v, s.bits); }).join(", ");
+    $("lab-rgb01").textContent = r.rgb.map(function (v) { return fix(v, 6); }).join(", ");
+    $("lab-clip").innerHTML = r.clipped
+      ? '<span class="badge warn">範囲外 — クリップあり</span>'
+      : '<span class="badge ok">範囲内</span>';
+    $("lab-d50").textContent = r.lab_d50.map(function (v) { return fix(v, 4); }).join(", ");
+    $("lab-actual").textContent = r.lab_actual.map(function (v) { return fix(v, 4); }).join(", ");
+    $("lab-de").textContent = fix(r.delta_e, 4);
+    var max = C.maxCode(s.bits);
+    swatch($("lab-swatch"), r.code.map(function (v) { return v / max; }), s.space);
+    $("lab-out").dataset.code = JSON.stringify(r.code);
+  }
+
+  function updateRgb() {
+    var s = settings(), errors = [], max = C.maxCode(s.bits), integer = s.bits !== 32;
+    var code = [
+      readNumber($("rgb-r"), 0, max, integer, "R", errors),
+      readNumber($("rgb-g"), 0, max, integer, "G", errors),
+      readNumber($("rgb-b"), 0, max, integer, "B", errors),
+    ];
+    if (s.bits === 32) code = code.map(Math.fround);
+    $("rgb-error").textContent = errors.join(" / ");
+    $("rgb-out").hidden = errors.length > 0;
+    if (errors.length) return;
+    var r = C.rgbToLab(P, code, s.space, s.white, s.bits);
+    $("rgb-lab").textContent = r.lab.map(function (v) { return fix(v, 4); }).join(", ");
+    $("rgb-white").textContent = s.white;
+    $("rgb-d50").textContent = r.lab_d50.map(function (v) { return fix(v, 4); }).join(", ");
+    $("rgb-rgb01").textContent = r.rgb.map(function (v) { return fix(v, 6); }).join(", ");
+    swatch($("rgb-swatch"), r.rgb, s.space);
+    $("rgb-out").dataset.lab = JSON.stringify(r.lab);
+  }
+
+  function updateAll() {
+    $("lab-white").textContent = settings().white;
+    updateLab();
+    updateRgb();
+  }
+
+  // bit 深度を変えたら、RGB の入力を新しい範囲へ換算して見た目の色を保つ
+  var lastBits = settings().bits;
+  $("bits").addEventListener("change", function () {
+    var s = settings(), oldMax = C.maxCode(lastBits), newMax = C.maxCode(s.bits);
+    ["rgb-r", "rgb-g", "rgb-b"].forEach(function (id) {
+      var v = Number($(id).value);
+      if (!isFinite(v)) return;
+      var x = (v / oldMax) * newMax;
+      $(id).value = s.bits === 32 ? fix(x, 6) : String(Math.round(x));
+      $(id).step = s.bits === 32 ? "0.000001" : "1";
+      $(id).max = String(newMax);
+    });
+    lastBits = s.bits;
+    updateAll();
+  });
+  ["space", "white"].forEach(function (id) { $(id).addEventListener("change", updateAll); });
+  ["lab-l", "lab-a", "lab-b"].forEach(function (id) {
+    $(id).addEventListener("input", updateLab);
+  });
+  ["rgb-r", "rgb-g", "rgb-b"].forEach(function (id) {
+    $(id).addEventListener("input", updateRgb);
+  });
+
+  // 結果を反対側の入力へ送る (往復を確かめる)
+  $("to-rgb").addEventListener("click", function () {
+    var code = JSON.parse($("lab-out").dataset.code || "null"), bits = settings().bits;
+    if (!code) return;
+    ["rgb-r", "rgb-g", "rgb-b"].forEach(function (id, i) { $(id).value = fmtCode(code[i], bits); });
+    updateRgb();
+  });
+  $("to-lab").addEventListener("click", function () {
+    var lab = JSON.parse($("rgb-out").dataset.lab || "null");
+    if (!lab) return;
+    ["lab-l", "lab-a", "lab-b"].forEach(function (id, i) { $(id).value = fix(lab[i], 4); });
+    updateLab();
+  });
+
+  // 自己チェック: Python (colour-science) で計算した答えと、このページの計算を照合する
+  var chk = C.selfCheck(P), box = $("self-check");
+  if (chk.failures.length === 0) {
+    box.className = "check ok";
+    box.textContent = "自己チェック OK: Python (colour-science) で計算した答え " + chk.total +
+      " 件と、このページの計算結果がすべて一致しました。";
+  } else {
+    box.className = "check warn";
+    box.textContent = "自己チェックで不一致があります (" + chk.failures.length + " / " + chk.total +
+      " 件)。このブラウザでは結果を信用しないでください。";
+  }
+
+  updateAll();
+})();
+</script>
+</body>
+</html>
